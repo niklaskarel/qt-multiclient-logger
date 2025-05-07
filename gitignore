@@ -1,0 +1,41 @@
+# Qt build
+*.pro.user
+*.autosave
+*.user
+*.qrc
+*.ui~
+*.o
+*.obj
+*.so
+*.a
+*.dll
+*.exe
+*.out
+*.app
+*.moc
+Makefile*
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+build/
+build-*/
+
+# Qt Creator clutter
+*.creator*
+*.pro.user*
+*.qmlproject.user*
+*.qbs.user*
+*.directory
+
+# Logs and other output
+*.log
+*.txt~
+*.swp
+*.tmp
+*.bak
+*.old
+logs/
+
+# Python artifacts
+__pycache__/
+*.pyc
