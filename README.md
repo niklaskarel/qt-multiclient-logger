@@ -58,7 +58,11 @@ Feel free to adapt, extend, or integrate this logger with your own backend or UI
 ### TODO
 
 ## 🔧 Technical Improvements
-- Expand the possible communication between the backend and frontend with WebSocket and REST
+- Explore alternative communication protocols between frontend and backend, including:
+  - WebSocket: for real-time bidirectional message streaming (client ↔ server)
+  - REST API: for structured control, querying, and persistent log submission
+  - This includes manual JSON serialization/parsing and potential integration with PostgreSQL for durable log storage.
+- Explore libpq usage and manual memory handling in C/C++ context
 - Add second way of messaging formating (f.e CAN)
 - Add a settings panel to adjust:
   - Message flush interval
