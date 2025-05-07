@@ -1,0 +1,8 @@
+C:/Users/nlask/OneDrive/Dokumente/EventMonitor/build/Desktop_Qt_6_8_1_MSVC2022_64bit-Debug/CMakeFiles/EventMonitor.dir
+C:/Users/nlask/OneDrive/Dokumente/EventMonitor/build/Desktop_Qt_6_8_1_MSVC2022_64bit-Debug/CMakeFiles/edit_cache.dir
+C:/Users/nlask/OneDrive/Dokumente/EventMonitor/build/Desktop_Qt_6_8_1_MSVC2022_64bit-Debug/CMakeFiles/rebuild_cache.dir
+C:/Users/nlask/OneDrive/Dokumente/EventMonitor/build/Desktop_Qt_6_8_1_MSVC2022_64bit-Debug/CMakeFiles/list_install_components.dir
+C:/Users/nlask/OneDrive/Dokumente/EventMonitor/build/Desktop_Qt_6_8_1_MSVC2022_64bit-Debug/CMakeFiles/install.dir
+C:/Users/nlask/OneDrive/Dokumente/EventMonitor/build/Desktop_Qt_6_8_1_MSVC2022_64bit-Debug/CMakeFiles/install/local.dir
+C:/Users/nlask/OneDrive/Dokumente/EventMonitor/build/Desktop_Qt_6_8_1_MSVC2022_64bit-Debug/CMakeFiles/EventMonitor_autogen_timestamp_deps.dir
+C:/Users/nlask/OneDrive/Dokumente/EventMonitor/build/Desktop_Qt_6_8_1_MSVC2022_64bit-Debug/CMakeFiles/EventMonitor_autogen.dir

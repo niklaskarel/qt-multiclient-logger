@@ -26,6 +26,7 @@ build-*/
 *.qmlproject.user*
 *.qbs.user*
 *.directory
+*.qEXREZ
 
 # Logs and other output
 *.log
