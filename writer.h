@@ -19,6 +19,7 @@ public:
 
     void setLogFilePath(const QString &path);
     void enqueue(const EventMessage &msg);
+    void finish();
 
 protected:
     void run() override;

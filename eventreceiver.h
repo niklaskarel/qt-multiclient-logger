@@ -22,8 +22,7 @@ private slots:
     void onReadyRead(QTcpSocket* socket);
 
 private:
-    QTcpSocket *clientSocket = nullptr;
-    QMap<uint32_t, QTcpSocket*> clientSockets;
+    QMap<uint32_t, QTcpSocket*> m_clientSockets;
 };
 
 #endif // EVENTRECEIVER_H

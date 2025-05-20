@@ -1,8 +1,0 @@
-2025-05-07 06:53:54 Module 2 [INFO]: Module 2 manually stopped by user.
-2025-05-07 06:53:54 Module 1 [INFO]: Module 1 manually stopped by user.
-2025-05-07 06:53:55 Module 2 [INFO]: Module 2 manually stopped by user.
-2025-05-07 06:53:57 Module 1 [INFO]: Module 1 manually stopped by user.
-2025-05-07 06:53:58 Module 1 [INFO]: Module 1 manually stopped by user.
-2025-05-07 06:53:58 Module 2 [INFO]: Module 2 manually stopped by user.
-2025-05-07 06:53:59 Module 1 [INFO]: Module 1 manually stopped by user.
-2025-05-07 06:53:59 Module 2 [INFO]: Module 2 manually stopped by user.

@@ -47,3 +47,10 @@ void Writer::run() {
         }
     }
 }
+
+void Writer::finish()
+{
+    QMutexLocker locker(&m_mutex);
+    m_running = false;
+    m_wait.wakeAll();
+}

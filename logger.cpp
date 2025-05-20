@@ -12,9 +12,7 @@ Logger::Logger(QObject *parent)
 }
 
 Logger::~Logger() {
-    if (m_logWriter) {
-        delete m_logWriter;
-    }
+    stop();
 }
 
 void Logger::addMessage(const EventMessage &msg) {
@@ -42,8 +40,12 @@ void Logger::addMessage(const EventMessage &msg) {
 
 void Logger::flushBuffer() {
     if (!m_buffer.empty()) {
-        emit messageReady(m_buffer.front());
+        EventMessage const msg = m_buffer.front();
+        emit messageReady(msg);
         m_buffer.pop_front();
+        if (m_logWriter) {
+            m_logWriter->enqueue(msg);
+        }
     }
 }
 
@@ -66,9 +68,11 @@ void Logger::startNewLogFile() {
     m_logFilePath = logDir.filePath("logger_" + timestamp + ".txt");
 
     if (m_logWriter) {
-        delete m_logWriter;
+        m_logWriter->finish();
+        m_logWriter->wait();
+        m_logWriter.reset();
     }
-    m_logWriter = new Writer(this);
+    m_logWriter = std::make_unique<Writer>(this);
     m_logWriter->setLogFilePath(m_logFilePath);
     m_logWriter->start();
 }
@@ -82,4 +86,14 @@ void Logger::logManualStop(uint32_t const moduleId) {
     if (m_logWriter) {
         m_logWriter->enqueue(msg);
     }
+}
+
+void Logger::stop()
+{
+    if (m_logWriter) {
+        m_logWriter->finish();
+        m_logWriter->wait();
+        m_logWriter.reset();
+    }
+    clear();
 }

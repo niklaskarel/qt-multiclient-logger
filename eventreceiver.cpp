@@ -8,11 +8,11 @@ EventReceiver::EventReceiver(QObject *parent) : QTcpServer(parent) {
 }
 
 void EventReceiver::stopClient(uint32_t clientId) {
-    if (clientSockets.contains(clientId)) {
-        QTcpSocket *socket = clientSockets[clientId];
+    if (m_clientSockets.contains(clientId)) {
+        QTcpSocket *socket = m_clientSockets[clientId];
         socket->disconnectFromHost();
         socket->deleteLater();
-        clientSockets.remove(clientId);
+        m_clientSockets.remove(clientId);
     }
 }
 
@@ -21,7 +21,7 @@ void EventReceiver::onReadyRead(QTcpSocket* socket) {
 
     bool ok = false;
     uint32_t parsedClientSocket = socket->property("clientId").toUInt(&ok);
-    if (!ok || !clientSockets.contains(parsedClientSocket)) return;
+    if (!ok || !m_clientSockets.contains(parsedClientSocket)) return;
 
     QByteArray data = socket->readAll();
     QJsonDocument doc = QJsonDocument::fromJson(data);
@@ -72,14 +72,14 @@ void EventReceiver::onReadyRead(QTcpSocket* socket) {
 
     // if module 3 has a critical message stop the entire logger
     if ((msg.type == "CRITICAL") && (msg.clientId == 3)) {
-        for (QTcpSocket* s : clientSockets) {
+        for (QTcpSocket* s : m_clientSockets) {
             if (s) {
                 s->disconnect();
                 s->disconnectFromHost();
                 s->deleteLater();
             }
         }
-        clientSockets.clear();
+        m_clientSockets.clear();
     }
     // for the other 2 modules just stop the respective module
     else if (msg.type == "CRITICAL") {
@@ -114,14 +114,14 @@ void EventReceiver::onNewConnection() {
         return;
     }
 
-    if (clientSockets.contains(clientId)) {
-        QTcpSocket* oldSocket = clientSockets[clientId];
+    if (m_clientSockets.contains(clientId)) {
+        QTcpSocket* oldSocket = m_clientSockets[clientId];
         oldSocket->disconnectFromHost();
         oldSocket->deleteLater();
-        clientSockets.remove(clientId);
+        m_clientSockets.remove(clientId);
     }
 
-    clientSockets[clientId] = socket;
+    m_clientSockets[clientId] = socket;
     socket->setProperty("clientId", clientId);
 
     connect(socket, &QTcpSocket::readyRead, this, [=]() { onReadyRead(socket); });
@@ -131,8 +131,8 @@ void EventReceiver::onNewConnection() {
     connect(socket, &QTcpSocket::disconnected, this, [=]() {
         bool ok = false;
         uint32_t clientId = socket->property("clientId").toUInt(&ok);
-        if (ok && clientSockets.contains(clientId)) {
-            clientSockets.remove(clientId);
+        if (ok && m_clientSockets.contains(clientId)) {
+            m_clientSockets.remove(clientId);
         }
         socket->deleteLater();
     });

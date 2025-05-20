@@ -9,7 +9,7 @@
 constexpr uint32_t s_localPort {5050U};
 constexpr uint32_t s_numberOfModules = 3U;
 static std::array<bool, s_numberOfModules> s_errorNotified { false, false, false };
-static std::array<bool, s_numberOfModules> s_moduleStopped {false, false, false};
+static std::array<bool, s_numberOfModules> s_moduleStopped { false, false, false };
 constexpr uint32_t s_criticalModule = 3U;
 
 MainWindow::MainWindow(QWidget *parent)
@@ -103,13 +103,13 @@ void MainWindow::stopModule1() {
         s_moduleStopped[0] = true;
         if (s_moduleStopped[1] && s_moduleStopped[2]) {
             appendSystemMessage("The other modules are already stopped so the logger is stopping...\n");
-             b_startModules->setEnabled(true);
-             m_logger->clear();
+            m_logger->stop();
+            b_startModules->setEnabled(true);
 
-             if (m_triggerProcess && m_triggerProcess->state() != QProcess::NotRunning) {
-                 m_triggerProcess->kill();
-                 m_triggerProcess->waitForFinished();
-             }
+            if (m_triggerProcess && m_triggerProcess->state() != QProcess::NotRunning) {
+                m_triggerProcess->kill();
+                m_triggerProcess->waitForFinished();
+            }
         }
     }
 }
@@ -123,8 +123,8 @@ void MainWindow::stopModule2() {
         s_moduleStopped[1] = true;
         if (s_moduleStopped[0] && s_moduleStopped[2]) {
             appendSystemMessage("The other modules are already stopped so the logger is stopping...\n");
+            m_logger->stop();
             b_startModules->setEnabled(true);
-            m_logger->clear();
 
             if (m_triggerProcess && m_triggerProcess->state() != QProcess::NotRunning) {
                 m_triggerProcess->kill();
@@ -143,8 +143,8 @@ void MainWindow::stopModule3() {
         s_moduleStopped[2] = true;
         if (s_moduleStopped[0] && s_moduleStopped[1]) {
             appendSystemMessage("The other modules are already stopped so the logger is stopping...\n");
+            m_logger->stop();
             b_startModules->setEnabled(true);
-            m_logger->clear();
 
             if (m_triggerProcess && m_triggerProcess->state() != QProcess::NotRunning) {
                 m_triggerProcess->kill();
@@ -152,8 +152,6 @@ void MainWindow::stopModule3() {
             }
         }
     }
-
-
 }
 
 void MainWindow::appendSystemMessage(QString const & msg)
@@ -206,6 +204,10 @@ void MainWindow::handleMessage(const EventMessage &msg) {
             b_stopModule1->setEnabled(false);
             b_stopModule2->setEnabled(false);
             b_stopModule3->setEnabled(false);
+            // reset these for the next time the user click start
+            s_moduleStopped[0] = false;
+            s_moduleStopped[1] = false;
+            s_moduleStopped[2] = false;
             appendSystemMessage("CRITICAL message received from module 3. Logger auto-stopped.\n");
             QTimer *reenableStartTimer = new QTimer(this);
             reenableStartTimer->setInterval(LOGGER_FLUSH_INTERVAL_MS);
@@ -228,19 +230,26 @@ void MainWindow::handleMessage(const EventMessage &msg) {
                 appendSystemMessage("CRITICAL message received from module 1. Module 1 auto-stopped.\n");
             }
         }
-
-
     } else if (msg.type == "ERROR") {
         switch (msg.clientId){
-        case 1:
-            b_stopModule1->setEnabled(true);
+        case 1: {
+            if (!s_moduleStopped[0]) {
+                b_stopModule1->setEnabled(true);
+            }
             break;
-        case 2:
-            b_stopModule2->setEnabled(true);
+        }
+        case 2: {
+            if (!s_moduleStopped[1]) {
+                b_stopModule2->setEnabled(true);
+            }
             break;
-        case 3:
-            b_stopModule3->setEnabled(true);
+        }
+        case 3: {
+            if (!s_moduleStopped[2]) {
+                b_stopModule3->setEnabled(true);
+            }
             break;
+        }
         default:
             break;
         }
@@ -271,7 +280,7 @@ void MainWindow::displayMessage(const EventMessage &msg) {
         format.setFontWeight(QFont::Bold);
     }
 
-    cursor.insertText(QString("[%1] %2: %3\n").arg(msg.timestamp.toString(), msg.type, msg.text), format);
+    cursor.insertText(QString("[%1] Message from client%2 %3: %4\n").arg(msg.timestamp.toString(), QString::number(msg.clientId), msg.type, msg.text), format);
     t_textLog->setTextCursor(cursor);
     format.setForeground(Qt::black);
     format.setFontWeight(QFont::Normal);
