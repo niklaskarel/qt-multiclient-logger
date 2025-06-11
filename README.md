@@ -36,9 +36,13 @@ The GUI reacts to message severity—buttons are automatically disabled after CR
 - If **module 1 or 2** sends ERROR message → only that module"s stop button is activated.
 
 ## Build Instructions
-1. Install Qt 6 or Qt 5.15+
-2. Run `cmake` and `make` or open the project in Qt Creator
-3. Launch the application and use the "Start Modules" button to begin listening
+1. Install Qt 6.8.3 and CMake 3.28+
+2. `cmake -S . -B build`
+3. `cmake --build build`
+4. `cd build`
+5. run the executable
+
+Alternatively this procedure can be dont from the Qt Creator
 
 ## Code Highlights
 - `EventReceiver` inherits from `QTcpServer` and tracks client sockets in a `QMap`
@@ -57,13 +61,13 @@ Feel free to adapt, extend, or integrate this logger with your own backend or UI
 
 ### TODO
 
-## 🔧 Technical Improvements
+## Technical Improvements
 - Explore alternative communication protocols between frontend and backend, including:
-  - WebSocket: for real-time bidirectional message streaming (client ↔ server)
-  - REST API: for structured control, querying, and persistent log submission
+  - **WebSocket:** for real-time bidirectional message streaming (client ↔ server)
+  - **REST API:** for structured control, querying, and persistent log submission
   - This includes manual JSON serialization/parsing and potential integration with PostgreSQL for durable log storage.
-- Explore libpq usage and manual memory handling in C/C++ context
-- Add second way of messaging formating (f.e CAN)
+- Add support for **MQTT** as a communication method between system components, using a publish/subscribe architecture via an MQTT broker
+- Add second way of messaging formating (f.e **XML**, **Protobuf**)
 - Add a settings panel to adjust:
   - Message flush interval
   - Buffer size
