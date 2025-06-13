@@ -8,9 +8,6 @@
 #include "writer.h"
 #include <memory>
 
-constexpr int LOGGER_MAX_SIZE = 100;
-constexpr int LOGGER_FLUSH_INTERVAL_MS = 200;
-
 class Logger : public QObject {
     Q_OBJECT
 public:
@@ -21,6 +18,10 @@ public:
     void startNewLogFile();
     void logManualStop(uint32_t moduleId);
     void stop();
+    void setLoggerMaxSize(int const maxSize) { m_maxSize = maxSize; }
+    void setLoggerFlushInterval(int const flushInterval) { m_flushInterval = flushInterval; }
+    int getLoggerFlushInterval() const { return m_flushInterval; }
+    void applyFlushInterval();
 
 signals:
     void messageReady(const EventMessage &msg);
@@ -36,6 +37,8 @@ private:
     QTimer m_flushTimer;
     QString m_logFilePath;
     std::unique_ptr<Writer> m_logWriter;
+    int m_maxSize;
+    int m_flushInterval;
 };
 
 #endif // LOGGER_H

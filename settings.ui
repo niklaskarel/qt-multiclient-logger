@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Settings</class>
+ <widget class="QDialog" name="Settings">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>400</width>
+    <height>328</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Settings</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QTabWidget" name="tabWidget">
+     <property name="currentIndex">
+      <number>2</number>
+     </property>
+     <widget class="QWidget" name="connectionTab">
+      <attribute name="title">
+       <string>Connection Settings</string>
+      </attribute>
+      <layout class="QFormLayout" name="formLayout1">
+       <item row="0" column="0">
+        <widget class="QLabel" name="labelIpAddress">
+         <property name="text">
+          <string>IP Address:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QLineEdit" name="ipAddressLineEdit">
+         <property name="inputMask">
+          <string/>
+         </property>
+         <property name="text">
+          <string>127.0.0.1</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="labelTcpPort">
+         <property name="text">
+          <string>TCP Port:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QSpinBox" name="tcpPortSpinBox">
+         <property name="minimum">
+          <number>1</number>
+         </property>
+         <property name="maximum">
+          <number>65535</number>
+         </property>
+         <property name="value">
+          <number>1024</number>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="dataTab">
+      <attribute name="title">
+       <string>Data Settings</string>
+      </attribute>
+      <layout class="QFormLayout" name="formLayout2">
+       <item row="0" column="0">
+        <widget class="QLabel" name="labelUpperThreshold">
+         <property name="text">
+          <string>Upper Threshold:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QDoubleSpinBox" name="upperThresholdSpinBox">
+         <property name="minimum">
+          <double>50.009999999999998</double>
+         </property>
+         <property name="singleStep">
+          <double>0.000000000000000</double>
+         </property>
+         <property name="value">
+          <double>98.000000000000000</double>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="labelLowerThreshold">
+         <property name="text">
+          <string>Lower Threshold:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QDoubleSpinBox" name="lowerThresholdSpinBox">
+         <property name="maximum">
+          <double>49.990000000000002</double>
+         </property>
+         <property name="value">
+          <double>2.000000000000000</double>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="labelPlotTime">
+         <property name="text">
+          <string>Plot Time Displayed: </string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QSpinBox" name="plotTimeSpinBox">
+         <property name="minimum">
+          <number>1</number>
+         </property>
+         <property name="maximum">
+          <number>20</number>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="labelNumSamplesAvg">
+         <property name="text">
+          <string>Number of Samples Avg. : </string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QSpinBox" name="numSamplesAvgSpinBox">
+         <property name="minimum">
+          <number>2</number>
+         </property>
+         <property name="maximum">
+          <number>10</number>
+         </property>
+         <property name="value">
+          <number>5</number>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="loggerTab">
+      <attribute name="title">
+       <string>Logger Settings</string>
+      </attribute>
+      <layout class="QFormLayout" name="formLayout3">
+       <item row="0" column="0">
+        <widget class="QLabel" name="labelFlushInterval">
+         <property name="text">
+          <string>Flush Interval (ms):</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QSpinBox" name="flushIntervalSpinBox">
+         <property name="minimum">
+          <number>10</number>
+         </property>
+         <property name="maximum">
+          <number>250</number>
+         </property>
+         <property name="value">
+          <number>200</number>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="labelRingBufferSize">
+         <property name="text">
+          <string>Ring Buffer Size:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QSpinBox" name="ringBufferSizeSpinBox">
+         <property name="minimum">
+          <number>50</number>
+         </property>
+         <property name="maximum">
+          <number>150</number>
+         </property>
+         <property name="value">
+          <number>100</number>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

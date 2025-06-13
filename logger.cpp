@@ -5,8 +5,11 @@
 #include <QCoreApplication>
 
 Logger::Logger(QObject *parent)
-    : QObject(parent) {
-    m_flushTimer.setInterval(LOGGER_FLUSH_INTERVAL_MS);
+    : QObject(parent),
+    m_maxSize(100),
+    m_flushInterval(200)
+{
+    m_flushTimer.setInterval(m_flushInterval);
     connect(&m_flushTimer, &QTimer::timeout, this, &Logger::flushBuffer);
     m_flushTimer.start();
 }
@@ -17,7 +20,7 @@ Logger::~Logger() {
 
 void Logger::addMessage(const EventMessage &msg) {
     qDebug() << "Added message to buffer:" << msg.type << msg.text;
-    if (m_buffer.size() >= LOGGER_MAX_SIZE){
+    if (m_buffer.size() >= m_maxSize){
         auto it = std::find_if(m_buffer.begin(), m_buffer.end(), [](const EventMessage &m) {
             return m.type == "INFO" || m.type == "WARNING";
         });
@@ -96,4 +99,11 @@ void Logger::stop()
         m_logWriter.reset();
     }
     clear();
+}
+
+void Logger::applyFlushInterval()
+{
+    m_flushTimer.stop();
+    m_flushTimer.setInterval(m_flushInterval);
+    m_flushTimer.start();
 }

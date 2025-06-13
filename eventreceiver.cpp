@@ -3,7 +3,10 @@
 #include <QJsonObject>
 #include <QTimer>
 
-EventReceiver::EventReceiver(QObject *parent) : QTcpServer(parent) {
+EventReceiver::EventReceiver(QObject *parent) :
+    QTcpServer(parent),
+    m_localPort(1024)
+{
     connect(this, &QTcpServer::newConnection, this, &EventReceiver::onNewConnection);
 }
 
@@ -43,7 +46,7 @@ void EventReceiver::onReadyRead(QTcpSocket* socket) {
         msg.timestamp = QDateTime::currentDateTime();
         isMsgCorrupted = true;
     }
-    else if (!QSet<QString>{"INFO", "WARNING", "ERROR", "CRITICAL"}.contains(type)) {
+    else if (!QSet<QString>{"INFO", "WARNING", "ERROR", "CRITICAL", "DATA"}.contains(type)) {
         msg.clientId = parsedClientId;
         msg.text = QString("Corrupted message type received from client!Invalid message type!");
         msg.timestamp = QDateTime::currentDateTime();
@@ -97,7 +100,7 @@ void EventReceiver::onNewConnection() {
         return;
     }
 
-    QByteArray initialData = socket->peek(1024);
+    QByteArray initialData = socket->peek(m_localPort);
     QJsonDocument doc = QJsonDocument::fromJson(initialData);
     if (!doc.isObject()) {
         socket->disconnectFromHost();

@@ -10,25 +10,24 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Network Core)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Network Core PrintSupport)
 
 set(PROJECT_SOURCES
         main.cpp
-        mainwindow.cpp
-        mainwindow.h
-
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(EventMonitor
-        MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
+        mainwindow.cpp mainwindow.h mainwindow.ui
         eventreceiver.h eventreceiver.cpp
         eventmessage.h
         message_trigger.py
         logger.h logger.cpp
         writer.h writer.cpp
-
+        settings.h settings.cpp settings.ui
+        dataprocessor.h dataprocessor.cpp
+        3rdPartyLibraries/QCustomPlot/qcustomplot.cpp 3rdPartyLibraries/QCustomPlot/qcustomplot.h
 
     )
 # Define target properties for Android with Qt 6 as:
@@ -49,7 +48,20 @@ else()
     endif()
 endif()
 
-target_link_libraries(EventMonitor PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Network)
+add_definitions(-DQT_STATIC_BUILD)
+
+target_link_libraries(EventMonitor
+    PRIVATE
+    Qt${QT_VERSION_MAJOR}::Widgets
+    Qt${QT_VERSION_MAJOR}::Core
+    Qt${QT_VERSION_MAJOR}::Network
+    Qt${QT_VERSION_MAJOR}::PrintSupport
+)
+
+target_include_directories(EventMonitor
+    PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/3rdPartyLibraries/QCustomPlot
+)
 
 # Copy the Python script into the build directory
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/message_trigger.py ${CMAKE_CURRENT_BINARY_DIR}/message_trigger.py COPYONLY)
