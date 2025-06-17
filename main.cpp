@@ -17,11 +17,6 @@
 
 int main(int argc, char *argv[])
 {
-    qInstallMessageHandler([](QtMsgType type, const QMessageLogContext &context, const QString &msg) {
-        QByteArray localMsg = msg.toLocal8Bit();
-        fprintf(stderr, "QtLog: %s (%s:%u, %s)\n", localMsg.constData(), context.file, context.line, context.function);
-    });
-
     QApplication a(argc, argv);
     MainWindow w;
     w.show();

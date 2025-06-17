@@ -47,7 +47,8 @@ private:
     void appendSystemMessage(QString const & msg);
     void startPythonProcess();
     void killPythonProcess();
-
+    void stopModule(const int clientId, const bool logMessage);
+    void setSettingDialogValues(Settings &dlg);
 private:
     Ui::MainWindow *ui;
     // Processing incoming data from data points
@@ -72,5 +73,6 @@ private:
     PythonProcessManager * m_pythonProcessManager;
 
     QString m_ipAddress;
+    int m_localPort;
 };
 #endif // MAINWINDOW_H

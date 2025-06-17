@@ -76,6 +76,7 @@ void Logger::startNewLogFile() {
         m_logWriter.reset();
     }
     m_logWriter = std::make_unique<Writer>(this);
+    qDebug() << "Creating new log file:" << m_logFilePath;
     m_logWriter->setLogFilePath(m_logFilePath);
     m_logWriter->start();
 }
@@ -106,4 +107,24 @@ void Logger::applyFlushInterval()
     m_flushTimer.stop();
     m_flushTimer.setInterval(m_flushInterval);
     m_flushTimer.start();
+}
+
+void Logger::setLoggerMaxSize(int const maxSize)
+{
+    m_maxSize = maxSize;
+}
+
+void Logger::setLoggerFlushInterval(int const flushInterval)
+{
+    m_flushInterval = flushInterval;
+}
+
+int Logger::getLoggerFlushInterval() const
+{
+    return m_flushInterval;
+}
+
+int Logger::getLoggerMaxSize()
+{
+    return m_maxSize;
 }

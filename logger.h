@@ -18,9 +18,10 @@ public:
     void startNewLogFile();
     void logManualStop(uint32_t moduleId);
     void stop();
-    void setLoggerMaxSize(int const maxSize) { m_maxSize = maxSize; }
-    void setLoggerFlushInterval(int const flushInterval) { m_flushInterval = flushInterval; }
-    int getLoggerFlushInterval() const { return m_flushInterval; }
+    void setLoggerMaxSize(int const maxSize);
+    void setLoggerFlushInterval(int const flushInterval);
+    int getLoggerFlushInterval() const;
+    int getLoggerMaxSize();
     void applyFlushInterval();
 
 signals:

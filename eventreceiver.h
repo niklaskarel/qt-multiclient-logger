@@ -14,8 +14,6 @@ class EventReceiver : public QTcpServer
 public:
     explicit EventReceiver(QObject *parent = nullptr);
     void close();
-    int getLocalPort() const;
-    void setLocalPort(int port);
     void stopClient(uint32_t clientId);
 
 signals:
@@ -27,7 +25,6 @@ protected slots:
     void onReadyRead(QTcpSocket *socket);
 
 private:
-    int m_localPort;
     QMap<uint32_t, QTcpSocket*> m_clients;
     QMap<QTcpSocket*, QByteArray> m_pendingBuffers;
 };

@@ -18,7 +18,10 @@ This ongoing project is a Qt-based application that functions as a TCP server de
 This is a real-time log viewer showing messages from three simulated modules over TCP.
 The GUI reacts to message severity—buttons are automatically disabled after CRITICAL messages.
 
-![Screenshot of the Qt Logger GUI](image-1.png)
+![Screenshot of the main window of the Qt Logger GUI](Main_window.png)
+![Screenshot of the settings dialog for connection settings](Settings_dialog_connection_settings.png)
+![Screenshot of the settings dialog for data settings](Settings_dialog_data_settings.png)
+![Screenshot of the settings dialog for logger settings](Settings_dialog_logger_settings.png)
 
 ## Message Format (JSON)
 ```json
@@ -56,7 +59,8 @@ MIT License (or specify yours)
 
 ## Known issues
 
-As of 13/6/2025 The application crashes when the python script generates a critical error for module 3
+~~As of 13/6/2025 The application crashes when the python script generates a critical error for module 3~~
+Fixed on 17/6/2025: Crash caused by improper deletion of client sockets on CRITICAL messages from module 3 was resolved.
 
 ---
 
@@ -71,6 +75,7 @@ Feel free to adapt, extend, or integrate this logger with your own backend or UI
   - **WebSocket:** for real-time bidirectional message streaming (client ↔ server)
   - **REST API:** for structured control, querying, and persistent log submission
   - This includes manual JSON serialization/parsing and potential integration with PostgreSQL for durable log storage.
+- Refactor EventReceiver to use QThread per client socket to improve stability and avoid crashes due to cross-thread access or unexpected deletions. Current design using QTcpServer in the main thread is fragile under high traffic
 - Add support for **MQTT** as a communication method between system components, using a publish/subscribe architecture via an MQTT broker
 - Add second way of messaging formating (f.e **XML**, **Protobuf**)
 - Add a settings panel to adjust:

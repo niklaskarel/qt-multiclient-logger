@@ -21,6 +21,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_logger(new Logger(this)),
     m_pythonProcessManager (new PythonProcessManager(this)),
     m_ipAddress{"127.0.0.1"},
+    m_localPort(1024),
     ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
@@ -74,8 +75,26 @@ MainWindow::MainWindow(QWidget *parent)
 void MainWindow::onOpenSettings()
 {
     Settings dlg(this);
-    dlg.exec();
-    onSettingsChanged(dlg);
+    setSettingDialogValues(dlg);
+    if (dlg.exec() == QDialog::Accepted)
+    {
+        onSettingsChanged(dlg);
+    }
+}
+
+void  MainWindow::setSettingDialogValues(Settings &dlg)
+{
+    // all data processors have the same parameters
+    double const lower = m_processorModule1.getLowerThreshold();
+    double const upper = m_processorModule1.getUpperThreshold();
+    int const windowSize = m_processorModule1.getWindowSize();
+    double const plotWindowSec = m_processorModule1.getPlotTimeWindow();
+
+    // Logger settings
+    int const ringBufferSize = m_logger->getLoggerMaxSize();
+    int const flushInterval = m_logger->getLoggerFlushInterval();
+    dlg.loadSettings(m_ipAddress, m_localPort,lower, upper, plotWindowSec, windowSize, flushInterval, ringBufferSize);
+
 }
 
 void MainWindow::appendSystemMessage(QString const & msg)
@@ -97,12 +116,12 @@ void MainWindow::handleMessage(const EventMessage &msg) {
     if (msg.type == "CRITICAL") {
         if (msg.clientId == s_criticalModule) {
             m_receiver->close();
-            delete m_receiver;
+            m_receiver->deleteLater();
             m_receiver = nullptr;
             ui->stopModule1Button->setEnabled(false);
             ui->stopModule2Button->setEnabled(false);
             ui->stopModule3Button->setEnabled(false);
-            ui->stopModule3Button->setEnabled(false);
+            ui->stopApplicationButton->setEnabled(false);
             // reset these for the next time the user click start
             s_moduleStopped[0] = false;
             s_moduleStopped[1] = false;
@@ -121,14 +140,7 @@ void MainWindow::handleMessage(const EventMessage &msg) {
             killPythonProcess();
         }
         else{
-            if (msg.clientId == 1){
-                on_stopModule1Button_clicked();
-                appendSystemMessage("CRITICAL message received from module 1. Module 1 auto-stopped.\n");
-            }
-            else {
-                on_stopModule2Button_clicked();
-                appendSystemMessage("CRITICAL message received from module 2. Module 2 auto-stopped.\n");
-            }
+            stopModule(msg.clientId, false);
         }
     } else if (msg.type == "ERROR") {
         switch (msg.clientId){
@@ -184,24 +196,35 @@ void MainWindow::handleMessage(const EventMessage &msg) {
 }
 
 void MainWindow::displayMessage(const EventMessage &msg) {
-    qDebug() << "DISPLAY:" << msg.type << msg.text;
+    qDebug() << "DISPLAY:" << msg.clientId << msg.type << msg.text;
     m_watchdogTimer->start();
     QTextCursor cursor = ui->logTextEdit->textCursor();
     cursor.movePosition(QTextCursor::End);
 
     QTextCharFormat format;
-    if (msg.type == "INFO") {
-        format.setForeground(Qt::darkGreen);
-    } else if (msg.type == "WARNING") {
-        format.setForeground(Qt::darkYellow);
-    } else if (msg.type == "ERROR") {
-        format.setForeground(Qt::red);
-    } else if (msg.type == "CRITICAL") {
-        format.setForeground(Qt::magenta);
-        format.setFontWeight(QFont::Bold);
+    if ((msg.clientId == 1 && s_moduleStopped[0]) ||
+        (msg.clientId == 2 && s_moduleStopped[1]) ||
+        (msg.clientId == 3 && s_moduleStopped[2]))
+    {
+        format.setForeground(Qt::gray);
+        cursor.insertText(QString("[%1] Message from client%2 %3: %4 (%5)\n").
+                          arg(msg.timestamp.toString(), QString::number(msg.clientId), msg.type, msg.text, "message was already in the logger queue, the communication has already stopped"), format);
     }
-
-    cursor.insertText(QString("[%1] Message from client%2 %3: %4\n").arg(msg.timestamp.toString(), QString::number(msg.clientId), msg.type, msg.text), format);
+    else
+    {
+        if (msg.type == "INFO") {
+            format.setForeground(Qt::darkGreen);
+        } else if (msg.type == "WARNING") {
+            format.setForeground(Qt::darkYellow);
+        } else if (msg.type == "ERROR") {
+            format.setForeground(Qt::red);
+        } else if (msg.type == "CRITICAL") {
+            format.setForeground(Qt::magenta);
+            format.setFontWeight(QFont::Bold);
+        }
+        cursor.insertText(QString("[%1] Message from client%2 %3: %4\n").
+                          arg(msg.timestamp.toString(), QString::number(msg.clientId), msg.type, msg.text), format);
+    }
     ui->logTextEdit->setTextCursor(cursor);
     format.setForeground(Qt::black);
     format.setFontWeight(QFont::Normal);
@@ -221,10 +244,9 @@ void MainWindow::on_startModulesButton_clicked()
     }
 
     if (!m_receiver->isListening()) {
-        int const localPort = m_receiver->getLocalPort();
-        if (m_receiver->listen(QHostAddress{m_ipAddress}, localPort)) {
+        if (m_receiver->listen(QHostAddress{m_ipAddress}, m_localPort)) {
             m_logger->startNewLogFile();
-            appendSystemMessage(QString("Server started on port %1\n").arg(localPort));
+            appendSystemMessage(QString("Server started on port %1\n").arg(m_localPort));
             ui->startModulesButton->setEnabled(false);
             ui->stopApplicationButton->setEnabled(true);
             s_errorNotified = {false, false, false};
@@ -233,7 +255,7 @@ void MainWindow::on_startModulesButton_clicked()
             QTimer::singleShot(1000, this, &MainWindow::startPythonProcess);
 
         } else {
-            QMessageBox::critical(this, "Error", QString("Failed to start TCP server at port %1.\n").arg(localPort));
+            QMessageBox::critical(this, "Error", QString("Failed to start TCP server at port %1.\n").arg(m_localPort));
         }
     }
     else {
@@ -244,6 +266,17 @@ void MainWindow::on_startModulesButton_clicked()
 
 void MainWindow::on_stopApplicationButton_clicked()
 {
+    if (m_receiver == nullptr) {
+        // this code should never reached!
+        qDebug() << "tried to stop the application after the modules are stopped";
+        ui->stopApplicationButton->setEnabled(false);
+        ui->stopModule1Button->setEnabled(false);
+        ui->stopModule2Button->setEnabled(false);
+        ui->stopModule3Button->setEnabled(false);
+        ui->startModulesButton->setEnabled(true);
+        return;
+    }
+
     if (m_receiver->isListening()) {
         m_receiver->close();
     }
@@ -254,6 +287,7 @@ void MainWindow::on_stopApplicationButton_clicked()
     ui->stopModule2Button->setEnabled(false);
     ui->stopModule3Button->setEnabled(false);
     ui->stopApplicationButton->setEnabled(false);
+    s_moduleStopped = {true, true, true};
 
     appendSystemMessage("Application stopped by user. Flushing remaining messages...\n");
     QTimer *flushAndExitTimer = new QTimer(this);
@@ -279,56 +313,18 @@ void MainWindow::on_clearButton_clicked()
 
 void MainWindow::on_stopModule1Button_clicked()
 {
-    if (m_receiver->isListening()) {
-        m_receiver->stopClient(1);
-        m_logger->logManualStop(1);
-        appendSystemMessage("Module 1 manually stopped via Stop Module 1 button.\n");
-        ui->stopModule1Button->setEnabled(false);
-        s_moduleStopped[0] = true;
-        if (s_moduleStopped[1] && s_moduleStopped[2]) {
-            appendSystemMessage("The other modules are already stopped so the logger is stopping...\n");
-            m_logger->stop();
-            ui->startModulesButton->setEnabled(true);
-            ui->stopApplicationButton->setEnabled(false);
-            killPythonProcess();
-        }
-    }
+    stopModule(1, true);
 }
 
 
 void MainWindow::on_stopModule2Button_clicked()
 {
-    if (m_receiver->isListening()) {
-        m_receiver->stopClient(2);
-        m_logger->logManualStop(2);
-        appendSystemMessage("Module 2 manually stopped via Stop Module 2 button.\n");
-        ui->stopModule2Button->setEnabled(false);
-        s_moduleStopped[1] = true;
-        if (s_moduleStopped[0] && s_moduleStopped[2]) {
-            appendSystemMessage("The other modules are already stopped so the logger is stopping...\n");
-            m_logger->stop();
-            ui->startModulesButton->setEnabled(true);
-            ui->stopApplicationButton->setEnabled(false);
-            killPythonProcess();
-        }
-    }
+    stopModule(2, true);
 }
 
 void MainWindow::on_stopModule3Button_clicked()
 {
-    if (m_receiver->isListening()) {
-        m_receiver->stopClient(3);
-        m_logger->logManualStop(3);
-        appendSystemMessage("Module 3 manually stopped via Stop Module 3 button.\n");
-        ui->stopModule3Button->setEnabled(false);
-        s_moduleStopped[2] = true;
-        if (s_moduleStopped[0] && s_moduleStopped[1]) {
-            appendSystemMessage("The other modules are already stopped so the logger is stopping...\n");
-            m_logger->stop();
-            ui->startModulesButton->setEnabled(true);
-             ui->stopApplicationButton->setEnabled(false);
-            killPythonProcess();        }
-    }
+    stopModule(3, true);
 }
 
 void MainWindow::onSettingsChanged(const Settings & settings)
@@ -355,7 +351,7 @@ void MainWindow::onSettingsChanged(const Settings & settings)
     int const localPort = settings.getTcpPort();
     QString const ipAddress = settings.getIpAddress();
 
-    m_receiver->setLocalPort(localPort);
+    m_localPort = localPort;
     m_ipAddress = ipAddress;
 
     // Logger settings
@@ -406,7 +402,7 @@ void MainWindow::updatePlot()
 
 void MainWindow::startPythonProcess()
 {
-    m_pythonProcessManager->start(m_ipAddress, m_receiver->getLocalPort());
+    m_pythonProcessManager->start(m_ipAddress, m_localPort);
 }
 
 void MainWindow::killPythonProcess()
@@ -432,4 +428,38 @@ void MainWindow::handleTriggerCrashed()
 void MainWindow::handleTriggerFinished(int exitCode)
 {
      qDebug() << "Python process finished with exit code:" << exitCode;
+}
+
+void MainWindow::stopModule(const int clientId, const bool logMessage)
+{
+    if (m_receiver->isListening()) {
+        m_receiver->stopClient(clientId);
+        m_logger->logManualStop(clientId);
+        if(logMessage){
+            appendSystemMessage(QString("Module %1 manually stopped via Stop Module %1 button.\n").arg(clientId));
+        }
+        else {
+            appendSystemMessage(QString("CRITICAL message received from module 1. Module 1 auto-stopped.\n").arg(clientId));
+        }
+        switch (clientId){
+        case 1:
+            ui->stopModule1Button->setEnabled(false);
+            break;
+        case 2:
+            ui->stopModule2Button->setEnabled(false);
+            break;
+        case 3:
+            ui->stopModule3Button->setEnabled(false);
+            break;
+        default:
+            break;
+        }
+        s_moduleStopped[clientId -1] = true;
+        if (s_moduleStopped[0] && s_moduleStopped[1] && s_moduleStopped[2]) {
+            appendSystemMessage("The other modules are already stopped so the logger is stopping...\n");
+            m_logger->stop();
+            ui->startModulesButton->setEnabled(true);
+            ui->stopApplicationButton->setEnabled(false);
+            killPythonProcess();        }
+    }
 }

@@ -10,9 +10,16 @@ class DataProcessor
 public:
     DataProcessor();
 
+    // setters
     void setThresholds(const double lower, const double upper);
     void setWindowSize(const int windowSize);
     void setPlotTimeWindowSec(const double seconds);
+
+    // getters
+    double getLowerThreshold();
+    double getUpperThreshold();
+    int getWindowSize();
+    double getPlotTimeWindow();
 
     void addSample(const double value, QDateTime timestamp);
 

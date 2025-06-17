@@ -15,6 +15,12 @@ public:
     explicit Settings(QWidget *parent = nullptr);
     ~Settings();
 
+    // set the settings from the previous opening, or default values
+    void loadSettings(const QString & ipAddress, const int locaPort,
+                    const double lowerThres, const double upperThress,
+                    const int plotTime, const int numSamplesAvg,
+                    const int flushInterval, const int ringBufferSize);
+
     // getter functions
     int getTcpPort() const;
     QString getIpAddress() const;
