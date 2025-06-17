@@ -122,10 +122,6 @@ void MainWindow::handleMessage(const EventMessage &msg) {
             ui->stopModule2Button->setEnabled(false);
             ui->stopModule3Button->setEnabled(false);
             ui->stopApplicationButton->setEnabled(false);
-            // reset these for the next time the user click start
-            s_moduleStopped[0] = false;
-            s_moduleStopped[1] = false;
-            s_moduleStopped[2] = false;
             appendSystemMessage("CRITICAL message received from module 3. Logger auto-stopped.\n");
             QTimer *reenableStartTimer = new QTimer(this);
             reenableStartTimer->setInterval(m_logger->getLoggerFlushInterval());
@@ -138,6 +134,10 @@ void MainWindow::handleMessage(const EventMessage &msg) {
             });
             reenableStartTimer->start();
             killPythonProcess();
+            // reset these for the next time the user click start
+            s_moduleStopped[0] = false;
+            s_moduleStopped[1] = false;
+            s_moduleStopped[2] = false;
         }
         else{
             stopModule(msg.clientId, false);
@@ -206,9 +206,21 @@ void MainWindow::displayMessage(const EventMessage &msg) {
         (msg.clientId == 2 && s_moduleStopped[1]) ||
         (msg.clientId == 3 && s_moduleStopped[2]))
     {
-        format.setForeground(Qt::gray);
-        cursor.insertText(QString("[%1] Message from client%2 %3: %4 (%5)\n").
-                          arg(msg.timestamp.toString(), QString::number(msg.clientId), msg.type, msg.text, "message was already in the logger queue, the communication has already stopped"), format);
+        if (msg.type != "CRITICAL") {
+            format.setForeground(Qt::gray);
+            cursor.insertText(QString("[%1] Message from client%2 %3: %4 (%5)\n").
+                              arg(msg.timestamp.toString(), QString::number(msg.clientId), msg.type, msg.text, "message was already in the logger queue, the communication has already stopped"), format);
+        }
+        else {
+            // most of the time the CRITICAL message for each module from flushing the buffer
+            // will come after the s_moduleStopped[X] was flagged so the coloring of the message
+            // should be always the same for better visibility reasons
+            format.setForeground(Qt::magenta);
+            format.setFontWeight(QFont::Bold);
+            cursor.insertText(QString("[%1] Message from client%2 %3: %4\n").
+                              arg(msg.timestamp.toString(), QString::number(msg.clientId), msg.type, msg.text), format);
+        }
+
     }
     else
     {
@@ -250,9 +262,11 @@ void MainWindow::on_startModulesButton_clicked()
             ui->startModulesButton->setEnabled(false);
             ui->stopApplicationButton->setEnabled(true);
             s_errorNotified = {false, false, false};
+            s_moduleStopped = {false, false, false};
             m_watchdogTimer->start();
 
             QTimer::singleShot(1000, this, &MainWindow::startPythonProcess);
+            ui->actionSettings->setEnabled(false);
 
         } else {
             QMessageBox::critical(this, "Error", QString("Failed to start TCP server at port %1.\n").arg(m_localPort));
@@ -274,6 +288,7 @@ void MainWindow::on_stopApplicationButton_clicked()
         ui->stopModule2Button->setEnabled(false);
         ui->stopModule3Button->setEnabled(false);
         ui->startModulesButton->setEnabled(true);
+        ui->actionSettings->setEnabled(true);
         return;
     }
 
@@ -287,6 +302,7 @@ void MainWindow::on_stopApplicationButton_clicked()
     ui->stopModule2Button->setEnabled(false);
     ui->stopModule3Button->setEnabled(false);
     ui->stopApplicationButton->setEnabled(false);
+    ui->actionSettings->setEnabled(true);
     s_moduleStopped = {true, true, true};
 
     appendSystemMessage("Application stopped by user. Flushing remaining messages...\n");
@@ -460,6 +476,7 @@ void MainWindow::stopModule(const int clientId, const bool logMessage)
             m_logger->stop();
             ui->startModulesButton->setEnabled(true);
             ui->stopApplicationButton->setEnabled(false);
+            ui->actionSettings->setEnabled(true);
             killPythonProcess();        }
     }
 }
