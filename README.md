@@ -1,5 +1,7 @@
 # Qt Multi-Client TCP Logger
 
+**Note (June 17, 2025): Major bug fixes and UX improvements pushed. If you reviewed the project earlier, please pull the latest version. Earlier issues—including a crash when receiving malformed CRITICAL messages—have been addressed and documented.**
+
 This ongoing project is a Qt-based application that functions as a TCP server designed to handle up to three concurrent clients (modules), each sending structured JSON messages over TCP. It features real-time message logging, GUI-based controls, error-handling mechanisms tailored for critical communication systems or monitoring tools and Writer that currently writes to a single session log file, with module identifiers included in each entry for traceability; advanced options are part of the ongoing development roadmap. It also displaysa basi graph using QCustomPlot of the incoming data points after some basic thresholding and filtering.
 
 ## Features
