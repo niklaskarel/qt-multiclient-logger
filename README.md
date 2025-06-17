@@ -54,6 +54,10 @@ Alternatively this procedure can be dont from the Qt Creator
 ## License
 MIT License (or specify yours)
 
+## Known issues
+
+As of 13/6/2025 The application crashes when the python script generates a critical error for module 3
+
 ---
 
 **Author:** Nikolaos Laskarelias
