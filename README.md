@@ -1,14 +1,15 @@
 # Qt Multi-Client TCP Logger
 
-This ongoing project is a Qt-based application that functions as a TCP server designed to handle up to three concurrent clients (modules), each sending structured JSON messages. It features real-time message logging, GUI-based controls, error-handling mechanisms tailored for critical communication systems or monitoring tools and Writer that currently writes to a single session log file, with module identifiers included in each entry for traceability; advanced options are part of the ongoing development roadmap.
+This ongoing project is a Qt-based application that functions as a TCP server designed to handle up to three concurrent clients (modules), each sending structured JSON messages over TCP. It features real-time message logging, GUI-based controls, error-handling mechanisms tailored for critical communication systems or monitoring tools and Writer that currently writes to a single session log file, with module identifiers included in each entry for traceability; advanced options are part of the ongoing development roadmap. It also displaysa basi graph using QCustomPlot of the incoming data points after some basic thresholding and filtering.
 
 ## Features
 
 - Supports up to 3 TCP clients simultaneously
 - Parses JSON messages with `clientId`, `type`, `message`, and `timestamp`
-- GUI with real-time log view and control buttons for stopping individual modules
+- GUI with real-time log view, control buttons for stopping individual modules and graph that shows sensor data for each client using a moving average
+- Settings dialog to configure: Port number, IP address, Plotting window duration, Thresholds for incoming sensor values, Flush interval and buffer size
 - Graceful disconnection and cleanup on critical failures
-- Python script included for automated message triggering
+- Python script included to simulate real client traffic with randomized message generation.
 - Logger system with bounded message queue and severity-based message discarding
 - Writer that writes the log messages to separate txt files in a predefined directory (ongoing)
 
@@ -23,14 +24,14 @@ The GUI reacts to message severity—buttons are automatically disabled after CR
 ```json
 {
   "client": 1,
-  "type": "INFO", // INFO, WARNING, ERROR, CRITICAL
+  "type": "INFO", // INFO, WARNING, ERROR, CRITICAL, DATA
   "message": "Module started",
   "timestamp": "2025-05-06 06:29:51"
 }
 ```
 
 ## Critical Behavior Logic
-- If **module 3** sends a CRITICAL message → all modules are disconnected and the logger stops.
+- If **module 3** sends a CRITICAL message → all modules are disconnected and the application stops.
 - If **module 1 or 2** sends CRITICAL message → only that module is stopped.
 - If **module 3** sends a ERROR message → all three stop Module buttons are activated and the user can manually stop the modules.
 - If **module 1 or 2** sends ERROR message → only that module"s stop button is activated.
@@ -69,16 +70,13 @@ Feel free to adapt, extend, or integrate this logger with your own backend or UI
 - Add support for **MQTT** as a communication method between system components, using a publish/subscribe architecture via an MQTT broker
 - Add second way of messaging formating (f.e **XML**, **Protobuf**)
 - Add a settings panel to adjust:
-  - Message flush interval
-  - Buffer size
-  - Port number
   - Give the user the possibility to chose a communication method between TCPSocket, WebSocket or REST
   - Give the user the possibility to chose message formating
 
 
 ## Functional Extensions
 - Support WebSocket or UDP modes for remote message streaming
-- Add message statistics (count by type)
+- Graphical message statistics (e.g., number of errors)
 - Authentication/token for sender script (basic security)
 - Use JSON schema validation for incoming messages
 

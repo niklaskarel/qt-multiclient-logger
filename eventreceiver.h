@@ -2,30 +2,34 @@
 #define EVENTRECEIVER_H
 
 #include <QTcpServer>
-#include <QTcpSocket>
-#include <QObject>
+#include <QHostAddress>
 #include <QMap>
 #include "eventmessage.h"
 
-class EventReceiver : public QTcpServer {
+class QTcpSocket;
+
+class EventReceiver : public QTcpServer
+{
     Q_OBJECT
 public:
     explicit EventReceiver(QObject *parent = nullptr);
+    void close();
+    int getLocalPort() const;
+    void setLocalPort(int port);
     void stopClient(uint32_t clientId);
-    void setLocalPort(const int port) { m_localPort = port; }
-    int getLocalPort() const { return m_localPort; }
 
 signals:
     void messageReceived(const EventMessage &msg);
-    void clientStopped(uint32_t clientId);
+    void clientStopped(int clientId);
 
-private slots:
-    void onNewConnection();
-    void onReadyRead(QTcpSocket* socket);
+protected slots:
+    void handleNewConnection();
+    void onReadyRead(QTcpSocket *socket);
 
 private:
-    QMap<uint32_t, QTcpSocket*> m_clientSockets;
     int m_localPort;
+    QMap<uint32_t, QTcpSocket*> m_clients;
+    QMap<QTcpSocket*, QByteArray> m_pendingBuffers;
 };
 
 #endif // EVENTRECEIVER_H

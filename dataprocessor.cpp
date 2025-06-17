@@ -9,18 +9,18 @@ DataProcessor::DataProcessor():
 
 }
 
-void DataProcessor::setThresholds(double lower, double upper)
+void DataProcessor::setThresholds(const double lower, const double upper)
 {
     m_lowerThreshold = lower;
     m_upperThreshold = upper;
 }
 
-void DataProcessor::setWindowSize(int windowSize)
+void DataProcessor::setWindowSize(const int windowSize)
 {
     m_windowSize = qMax(1, windowSize);
 }
 
-void DataProcessor::setPlotTimeWindowSec(double seconds)
+void DataProcessor::setPlotTimeWindowSec(const double seconds)
 {
     m_plotTimeWindowSec = seconds;
 }

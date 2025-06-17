@@ -19,7 +19,7 @@ Logger::~Logger() {
 }
 
 void Logger::addMessage(const EventMessage &msg) {
-    qDebug() << "Added message to buffer:" << msg.type << msg.text;
+    qDebug() << "Added message to buffer:" << msg.clientId << msg.type << msg.text;
     if (m_buffer.size() >= m_maxSize){
         auto it = std::find_if(m_buffer.begin(), m_buffer.end(), [](const EventMessage &m) {
             return m.type == "INFO" || m.type == "WARNING";

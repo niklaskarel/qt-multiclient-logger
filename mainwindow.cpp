@@ -19,7 +19,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_receiver(new EventReceiver(this)),
     m_watchdogTimer(new QTimer(this)),
     m_logger(new Logger(this)),
-    m_triggerProcess (new QProcess(this)),
+    m_pythonProcessManager (new PythonProcessManager(this)),
     m_ipAddress{"127.0.0.1"},
     ui(new Ui::MainWindow)
 {
@@ -28,13 +28,13 @@ MainWindow::MainWindow(QWidget *parent)
     m_customPlot = new QCustomPlot(this);
     ui->plotWidget->layout()->addWidget(m_customPlot);
 
-    m_graph1 = m_customPlot->addGraph();
-    m_graph2 = m_customPlot->addGraph();
-    m_graph3 = m_customPlot->addGraph();
+    m_graphModule1 = m_customPlot->addGraph();
+    m_graphModule2 = m_customPlot->addGraph();
+    m_graphModule3 = m_customPlot->addGraph();
 
-    m_graph1->setPen(QPen(Qt::red));
-    m_graph2->setPen(QPen(Qt::green));
-    m_graph3->setPen(QPen(Qt::blue));
+    m_graphModule1->setPen(QPen(Qt::red));
+    m_graphModule2->setPen(QPen(Qt::green));
+    m_graphModule3->setPen(QPen(Qt::blue));
 
     m_customPlot->xAxis->setLabel("Time (s)");
     m_customPlot->yAxis->setLabel("Value");
@@ -49,7 +49,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     ui->logTextEdit->setReadOnly(true);
     ui->startModulesButton->setEnabled(true);
-    ui->stopApplicationButton->setEnabled(true);
+    ui->stopApplicationButton->setEnabled(false);
     ui->stopModule1Button->setEnabled(false);
     ui->stopModule2Button->setEnabled(false);
     ui->stopModule3Button->setEnabled(false);
@@ -59,19 +59,16 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionSettings, &QAction::triggered, this, &MainWindow::onOpenSettings);
 
     m_watchdogTimer->setInterval(10000);
+    connect(m_pythonProcessManager, &PythonProcessManager::triggerOutput,
+            this, &MainWindow::handleTriggerOutput);
+    connect(m_pythonProcessManager, &PythonProcessManager::triggerError,
+            this, &MainWindow::handleTriggerError);
+    connect(m_pythonProcessManager, &PythonProcessManager::triggerCrashed,
+            this, &MainWindow::handleTriggerCrashed);
+    connect(m_pythonProcessManager, &PythonProcessManager::triggerFinished,
+            this, &MainWindow::handleTriggerFinished);
     connect(m_watchdogTimer, &QTimer::timeout, this, &MainWindow::handleWatchdogTimeout);
 
-    connect(m_triggerProcess, &QProcess::errorOccurred, this, [=](QProcess::ProcessError error) {
-        qDebug() << "Trigger process error:" << error << m_triggerProcess->errorString();
-    });
-
-    connect(m_triggerProcess, &QProcess::readyReadStandardError, this, [=]() {
-        qDebug() << "Trigger script stderr:" << m_triggerProcess->readAllStandardError();
-    });
-
-    connect(m_triggerProcess, &QProcess::readyReadStandardOutput, this, [=]() {
-        qDebug() << "Trigger script stdout:" << m_triggerProcess->readAllStandardOutput();
-    });
 }
 
 void MainWindow::onOpenSettings()
@@ -104,6 +101,7 @@ void MainWindow::handleMessage(const EventMessage &msg) {
             m_receiver = nullptr;
             ui->stopModule1Button->setEnabled(false);
             ui->stopModule2Button->setEnabled(false);
+            ui->stopModule3Button->setEnabled(false);
             ui->stopModule3Button->setEnabled(false);
             // reset these for the next time the user click start
             s_moduleStopped[0] = false;
@@ -149,6 +147,12 @@ void MainWindow::handleMessage(const EventMessage &msg) {
         case 3: {
             if (!s_moduleStopped[2]) {
                 ui->stopModule3Button->setEnabled(true);
+                if (!s_moduleStopped[0]) {
+                    ui->stopModule1Button->setEnabled(true);
+                }
+                if (!s_moduleStopped[1]) {
+                    ui->stopModule2Button->setEnabled(true);
+                }
             }
             break;
         }
@@ -169,11 +173,11 @@ void MainWindow::handleMessage(const EventMessage &msg) {
         if (match.hasMatch()) {
             double value = match.captured(1).toDouble();
             if (msg.clientId == 1) {
-                m_processor1.addSample(value, msg.timestamp);
+                m_processorModule1.addSample(value, msg.timestamp);
             } else if (msg.clientId == 2) {
-                m_processor2.addSample(value, msg.timestamp);
+                m_processorModule2.addSample(value, msg.timestamp);
             } else if (msg.clientId == 3) {
-                m_processor3.addSample(value, msg.timestamp);
+                m_processorModule3.addSample(value, msg.timestamp);
             }
         }
     }
@@ -222,6 +226,7 @@ void MainWindow::on_startModulesButton_clicked()
             m_logger->startNewLogFile();
             appendSystemMessage(QString("Server started on port %1\n").arg(localPort));
             ui->startModulesButton->setEnabled(false);
+            ui->stopApplicationButton->setEnabled(true);
             s_errorNotified = {false, false, false};
             m_watchdogTimer->start();
 
@@ -258,7 +263,6 @@ void MainWindow::on_stopApplicationButton_clicked()
             m_logger->flushBuffer();  // flush one message
         } else {
             appendSystemMessage("Application stopped.\n");
-            QTimer::singleShot(1000, this, &QWidget::close);
             flushAndExitTimer->stop();
             flushAndExitTimer->deleteLater();
         }
@@ -285,7 +289,7 @@ void MainWindow::on_stopModule1Button_clicked()
             appendSystemMessage("The other modules are already stopped so the logger is stopping...\n");
             m_logger->stop();
             ui->startModulesButton->setEnabled(true);
-
+            ui->stopApplicationButton->setEnabled(false);
             killPythonProcess();
         }
     }
@@ -304,7 +308,7 @@ void MainWindow::on_stopModule2Button_clicked()
             appendSystemMessage("The other modules are already stopped so the logger is stopping...\n");
             m_logger->stop();
             ui->startModulesButton->setEnabled(true);
-
+            ui->stopApplicationButton->setEnabled(false);
             killPythonProcess();
         }
     }
@@ -322,7 +326,7 @@ void MainWindow::on_stopModule3Button_clicked()
             appendSystemMessage("The other modules are already stopped so the logger is stopping...\n");
             m_logger->stop();
             ui->startModulesButton->setEnabled(true);
-
+             ui->stopApplicationButton->setEnabled(false);
             killPythonProcess();        }
     }
 }
@@ -335,17 +339,17 @@ void MainWindow::onSettingsChanged(const Settings & settings)
     int const windowSize = settings.getNumSamplesToAvg();
     double const plotWindowSec = settings.getPlotTime();
 
-    m_processor1.setThresholds(lower, upper);
-    m_processor2.setThresholds(lower, upper);
-    m_processor3.setThresholds(lower, upper);
+    m_processorModule1.setThresholds(lower, upper);
+    m_processorModule2.setThresholds(lower, upper);
+    m_processorModule3.setThresholds(lower, upper);
 
-    m_processor1.setWindowSize(windowSize);
-    m_processor2.setWindowSize(windowSize);
-    m_processor3.setWindowSize(windowSize);
+    m_processorModule1.setWindowSize(windowSize);
+    m_processorModule2.setWindowSize(windowSize);
+    m_processorModule3.setWindowSize(windowSize);
 
-    m_processor1.setPlotTimeWindowSec(plotWindowSec);
-    m_processor2.setPlotTimeWindowSec(plotWindowSec);
-    m_processor3.setPlotTimeWindowSec(plotWindowSec);
+    m_processorModule1.setPlotTimeWindowSec(plotWindowSec);
+    m_processorModule2.setPlotTimeWindowSec(plotWindowSec);
+    m_processorModule3.setPlotTimeWindowSec(plotWindowSec);
 
     // TCP connection settings
     int const localPort = settings.getTcpPort();
@@ -367,13 +371,13 @@ void MainWindow::updatePlot()
 {
     QDateTime currentTime = QDateTime::currentDateTime();
 
-    QVector<QPointF> data1 = m_processor1.getProcessedCurve(currentTime);
-    QVector<QPointF> data2 = m_processor2.getProcessedCurve(currentTime);
-    QVector<QPointF> data3 = m_processor3.getProcessedCurve(currentTime);
+    QVector<QPointF> data1 = m_processorModule1.getProcessedCurve(currentTime);
+    QVector<QPointF> data2 = m_processorModule2.getProcessedCurve(currentTime);
+    QVector<QPointF> data3 = m_processorModule3.getProcessedCurve(currentTime);
 
-    m_graph1->setData(QVector<double>(), QVector<double>());
-    m_graph2->setData(QVector<double>(), QVector<double>());
-    m_graph3->setData(QVector<double>(), QVector<double>());
+    m_graphModule1->setData(QVector<double>(), QVector<double>());
+    m_graphModule2->setData(QVector<double>(), QVector<double>());
+    m_graphModule3->setData(QVector<double>(), QVector<double>());
 
     QVector<double> x1, y1, x2, y2, x3, y3;
 
@@ -390,11 +394,11 @@ void MainWindow::updatePlot()
         y3.append(point.y());
     }
 
-    m_graph1->setData(x1, y1);
-    m_graph2->setData(x2, y2);
-    m_graph3->setData(x3, y3);
+    m_graphModule1->setData(x1, y1);
+    m_graphModule2->setData(x2, y2);
+    m_graphModule3->setData(x3, y3);
 
-    double windowSec = m_processor1.getPlotTimeWindowSec();
+    double windowSec = m_processorModule1.getPlotTimeWindowSec();
     m_customPlot->xAxis->setRange(-windowSec, 0);
     m_customPlot->yAxis->setRange(0,100);
     m_customPlot->replot();
@@ -402,21 +406,30 @@ void MainWindow::updatePlot()
 
 void MainWindow::startPythonProcess()
 {
-    QString portStr = QString::number(m_receiver->getLocalPort());
-
-    QStringList arguments;
-    arguments << "--ip" << m_ipAddress << "--port" << portStr;
-
-    QString scriptPath = QCoreApplication::applicationDirPath() + "/message_trigger.py";
-    if (m_triggerProcess->state() == QProcess::NotRunning) {
-        m_triggerProcess->start("python", QStringList() << scriptPath << arguments);
-    }
+    m_pythonProcessManager->start(m_ipAddress, m_receiver->getLocalPort());
 }
 
 void MainWindow::killPythonProcess()
 {
-    if (m_triggerProcess && m_triggerProcess->state() != QProcess::NotRunning) {
-        m_triggerProcess->kill();
-        m_triggerProcess->waitForFinished();
-    }
+    m_pythonProcessManager->stop();
+}
+
+void MainWindow::handleTriggerOutput(const QString &line)
+{
+    qDebug() << "[Python stdout]:" << line;
+}
+
+void MainWindow::handleTriggerError(const QString &error)
+{
+     qWarning() << "[Python stderr]:" << error;
+}
+
+void MainWindow::handleTriggerCrashed()
+{
+    qCritical() << "Python process crashed!";
+}
+
+void MainWindow::handleTriggerFinished(int exitCode)
+{
+     qDebug() << "Python process finished with exit code:" << exitCode;
 }

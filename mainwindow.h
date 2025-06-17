@@ -5,6 +5,7 @@
 #include <QTimer>
 #include <QProcess>
 #include "eventreceiver.h"
+#include "pythonprocessmanager.h"
 #include "dataprocessor.h"
 #include "qcustomplot.h"
 
@@ -36,6 +37,11 @@ private slots:
     void onOpenSettings();
     void onSettingsChanged(const Settings& settings);
     void updatePlot();
+    // Python script handling slots
+    void handleTriggerOutput(const QString &line);
+    void handleTriggerError(const QString &error);
+    void handleTriggerCrashed();
+    void handleTriggerFinished(int exitCode);
 
 private:
     void appendSystemMessage(QString const & msg);
@@ -44,22 +50,26 @@ private:
 
 private:
     Ui::MainWindow *ui;
-    DataProcessor m_processor1;
-    DataProcessor m_processor2;
-    DataProcessor m_processor3;
+    // Processing incoming data from data points
+    DataProcessor m_processorModule1;
+    DataProcessor m_processorModule2;
+    DataProcessor m_processorModule3;
 
+    //
     QCustomPlot *m_customPlot;
-    QCPGraph *m_graph1;
-    QCPGraph *m_graph2;
-    QCPGraph *m_graph3;
+    QCPGraph *m_graphModule1;
+    QCPGraph *m_graphModule2;
+    QCPGraph *m_graphModule3;
 
     // Message Handlers
     Logger *m_logger;
     EventReceiver *m_receiver;
+
+    // timers for the poitns ploting and logging
     QTimer *m_watchdogTimer;
     QTimer *m_plotUpdateTimer;
 
-    QProcess *m_triggerProcess;
+    PythonProcessManager * m_pythonProcessManager;
 
     QString m_ipAddress;
 };
