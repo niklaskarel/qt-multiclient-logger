@@ -122,22 +122,21 @@ void MainWindow::handleMessage(const EventMessage &msg) {
             ui->stopModule2Button->setEnabled(false);
             ui->stopModule3Button->setEnabled(false);
             ui->stopApplicationButton->setEnabled(false);
+            s_moduleStopped = {true, true, true};
             appendSystemMessage("CRITICAL message received from module 3. Logger auto-stopped.\n");
             QTimer *reenableStartTimer = new QTimer(this);
             reenableStartTimer->setInterval(m_logger->getLoggerFlushInterval());
             connect(reenableStartTimer, &QTimer::timeout, this, [this, reenableStartTimer]() {
                 if (m_logger->isEmpty()) {
                     ui->startModulesButton->setEnabled(true);
+                    ui->actionSettings->setEnabled(true);
                     reenableStartTimer->stop();
                     reenableStartTimer->deleteLater();
                 }
             });
             reenableStartTimer->start();
             killPythonProcess();
-            // reset these for the next time the user click start
-            s_moduleStopped[0] = false;
-            s_moduleStopped[1] = false;
-            s_moduleStopped[2] = false;
+
         }
         else{
             stopModule(msg.clientId, false);
@@ -196,52 +195,54 @@ void MainWindow::handleMessage(const EventMessage &msg) {
 }
 
 void MainWindow::displayMessage(const EventMessage &msg) {
-    qDebug() << "DISPLAY:" << msg.clientId << msg.type << msg.text;
-    m_watchdogTimer->start();
-    QTextCursor cursor = ui->logTextEdit->textCursor();
-    cursor.movePosition(QTextCursor::End);
+    QMetaObject::invokeMethod(this, [this, msg]() {
+        qDebug() << "DISPLAY:" << msg.clientId << msg.type << msg.text;
+        m_watchdogTimer->start();
+        QTextCursor cursor = ui->logTextEdit->textCursor();
+        cursor.movePosition(QTextCursor::End);
 
-    QTextCharFormat format;
-    if ((msg.clientId == 1 && s_moduleStopped[0]) ||
-        (msg.clientId == 2 && s_moduleStopped[1]) ||
-        (msg.clientId == 3 && s_moduleStopped[2]))
-    {
-        if (msg.type != "CRITICAL") {
-            format.setForeground(Qt::gray);
-            cursor.insertText(QString("[%1] Message from client%2 %3: %4 (%5)\n").
-                              arg(msg.timestamp.toString(), QString::number(msg.clientId), msg.type, msg.text, "message was already in the logger queue, the communication has already stopped"), format);
+        QTextCharFormat format;
+        if ((msg.clientId == 1 && s_moduleStopped[0]) ||
+            (msg.clientId == 2 && s_moduleStopped[1]) ||
+            (msg.clientId == 3 && s_moduleStopped[2]))
+        {
+            if (msg.type != "CRITICAL") {
+                format.setForeground(Qt::gray);
+                cursor.insertText(QString("[%1] Message from client%2 %3: %4 (%5)\n").
+                                  arg(msg.timestamp.toString(), QString::number(msg.clientId), msg.type, msg.text, "message was already in the logger queue, the communication has already stopped"), format);
+            }
+            else {
+                // most of the time the CRITICAL message for each module from flushing the buffer
+                // will come after the s_moduleStopped[X] was flagged so the coloring of the message
+                // should be always the same for better visibility reasons
+                format.setForeground(Qt::magenta);
+                format.setFontWeight(QFont::Bold);
+                cursor.insertText(QString("[%1] Message from client%2 %3: %4\n").
+                                  arg(msg.timestamp.toString(), QString::number(msg.clientId), msg.type, msg.text), format);
+            }
+
         }
-        else {
-            // most of the time the CRITICAL message for each module from flushing the buffer
-            // will come after the s_moduleStopped[X] was flagged so the coloring of the message
-            // should be always the same for better visibility reasons
-            format.setForeground(Qt::magenta);
-            format.setFontWeight(QFont::Bold);
+        else
+        {
+            if (msg.type == "INFO") {
+                format.setForeground(Qt::darkGreen);
+            } else if (msg.type == "WARNING") {
+                format.setForeground(Qt::darkYellow);
+            } else if (msg.type == "ERROR") {
+                format.setForeground(Qt::red);
+            } else if (msg.type == "CRITICAL") {
+                format.setForeground(Qt::magenta);
+                format.setFontWeight(QFont::Bold);
+            }
             cursor.insertText(QString("[%1] Message from client%2 %3: %4\n").
                               arg(msg.timestamp.toString(), QString::number(msg.clientId), msg.type, msg.text), format);
         }
-
-    }
-    else
-    {
-        if (msg.type == "INFO") {
-            format.setForeground(Qt::darkGreen);
-        } else if (msg.type == "WARNING") {
-            format.setForeground(Qt::darkYellow);
-        } else if (msg.type == "ERROR") {
-            format.setForeground(Qt::red);
-        } else if (msg.type == "CRITICAL") {
-            format.setForeground(Qt::magenta);
-            format.setFontWeight(QFont::Bold);
-        }
-        cursor.insertText(QString("[%1] Message from client%2 %3: %4\n").
-                          arg(msg.timestamp.toString(), QString::number(msg.clientId), msg.type, msg.text), format);
-    }
-    ui->logTextEdit->setTextCursor(cursor);
-    format.setForeground(Qt::black);
-    format.setFontWeight(QFont::Normal);
-    cursor.insertText(QString(""), format);
-    ui->logTextEdit->setTextCursor(cursor);
+        ui->logTextEdit->setTextCursor(cursor);
+        format.setForeground(Qt::black);
+        format.setFontWeight(QFont::Normal);
+        cursor.insertText(QString(""), format);
+        ui->logTextEdit->setTextCursor(cursor);
+    }, Qt::QueuedConnection);
 }
 
 void MainWindow::handleWatchdogTimeout() {

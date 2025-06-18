@@ -6,7 +6,7 @@
 
 Logger::Logger(QObject *parent)
     : QObject(parent),
-    m_maxSize(100),
+    m_maxSize(500),
     m_flushInterval(200)
 {
     m_flushTimer.setInterval(m_flushInterval);
@@ -22,20 +22,34 @@ void Logger::addMessage(const EventMessage &msg) {
     qDebug() << "Added message to buffer:" << msg.clientId << msg.type << msg.text;
     if (m_buffer.size() >= m_maxSize){
         auto it = std::find_if(m_buffer.begin(), m_buffer.end(), [](const EventMessage &m) {
-            return m.type == "INFO" || m.type == "WARNING";
+            return m.type == "DATA";
         });
         if (it != m_buffer.end()) {
-            m_buffer.erase(it);  // Drop first INFO/WARNING message, as they are lower prio
+            m_buffer.erase(it);  // Drop first DATA message, as they are lower prio
+        } else if (msg.type == "WARNING") {
+            auto it = std::find_if(m_buffer.begin(), m_buffer.end(), [](const EventMessage &m) {
+                return m.type == "INFO" || m.type == "INFO";
+            });
+            if (it != m_buffer.end())
+                m_buffer.erase(it); // Drop first INFO message if there is a warning
+        } else if (msg.type == "ERROR") {
+                auto it = std::find_if(m_buffer.begin(), m_buffer.end(), [](const EventMessage &m) {
+                    return m.type == "INFO" || m.type == "WARNING";
+                });
+                if (it != m_buffer.end())
+                    m_buffer.erase(it); // Drop first INFO or WARNING message if there is a error
         } else if (msg.type == "CRITICAL"){
             // If the message is CRITICAL drop an ERROR, if it exists
             it = std::find_if(m_buffer.begin(), m_buffer.end(), [](const EventMessage &m) {
-                return m.type == "ERROR";
+                return m.type == "INFO" || m.type == "WARNING" || m.type == "ERROR";
             });
-            if (it != m_buffer.end())
-                m_buffer.erase(it);
-        } else {
-            // If no INFO/WARNING exists, and the message is ERROR dont drop anything
-            return;
+            if (it != m_buffer.end()){
+                m_buffer.erase(it); // Drop any message that is not critical to display critical
+            } else {
+            // If no other DATA/INFO/WARNING/ERROR message exists, and the message is CRITICAL dont drop anything
+            // but also dont add it to the queue because its full
+                return;
+            }
         }
     }
     m_buffer.push_back(msg);

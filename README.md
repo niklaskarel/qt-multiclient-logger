@@ -80,6 +80,8 @@ Feel free to adapt, extend, or integrate this logger with your own backend or UI
   - **REST API:** for structured control, querying, and persistent log submission
   - This includes manual JSON serialization/parsing and potential integration with PostgreSQL for durable log storage.
 - Refactor EventReceiver to use QThread per client socket to improve stability and avoid crashes due to cross-thread access or unexpected deletions. Current design using QTcpServer in the main thread is fragile under high traffic
+- Refactor Logger to run in its own thread to handle high-throughput message processing.
+- Current architecture is tightly coupled: MainWindow handles transport and control logic. Refactoring planned to introduce an EventOrchestrator for better separation of concerns (UI vs. logic vs. transport).
 - Add QCustomPlot as a dynamic library and not as a static as it is increasing the time for building.
 - Add support for **MQTT** as a communication method between system components, using a publish/subscribe architecture via an MQTT broker
 - Add second way of messaging formating (f.e **XML**, **Protobuf**)
