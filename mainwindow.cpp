@@ -123,20 +123,7 @@ void MainWindow::handleMessage(const EventMessage &msg) {
             ui->stopModule3Button->setEnabled(false);
             ui->stopApplicationButton->setEnabled(false);
             s_moduleStopped = {true, true, true};
-            appendSystemMessage("CRITICAL message received from module 3. Logger auto-stopped.\n");
-            QTimer *reenableStartTimer = new QTimer(this);
-            reenableStartTimer->setInterval(m_logger->getLoggerFlushInterval());
-            connect(reenableStartTimer, &QTimer::timeout, this, [this, reenableStartTimer]() {
-                if (m_logger->isEmpty()) {
-                    ui->startModulesButton->setEnabled(true);
-                    ui->actionSettings->setEnabled(true);
-                    reenableStartTimer->stop();
-                    reenableStartTimer->deleteLater();
-                }
-            });
-            reenableStartTimer->start();
-            killPythonProcess();
-
+            flushLoggerAfterAppStop("CRITICAL message received from module 3. Logger auto-stopped.\n");
         }
         else{
             stopModule(msg.clientId, false);
@@ -297,28 +284,13 @@ void MainWindow::on_stopApplicationButton_clicked()
         m_receiver->close();
     }
 
-    killPythonProcess();
-    ui->startModulesButton->setEnabled(true);
     ui->stopModule1Button->setEnabled(false);
     ui->stopModule2Button->setEnabled(false);
     ui->stopModule3Button->setEnabled(false);
     ui->stopApplicationButton->setEnabled(false);
-    ui->actionSettings->setEnabled(true);
     s_moduleStopped = {true, true, true};
 
-    appendSystemMessage("Application stopped by user. Flushing remaining messages...\n");
-    QTimer *flushAndExitTimer = new QTimer(this);
-    flushAndExitTimer->setInterval(m_logger->getLoggerFlushInterval());
-    connect(flushAndExitTimer, &QTimer::timeout, this, [this, flushAndExitTimer]() {
-        if (!m_logger->isEmpty()) {
-            m_logger->flushBuffer();  // flush one message
-        } else {
-            appendSystemMessage("Application stopped.\n");
-            flushAndExitTimer->stop();
-            flushAndExitTimer->deleteLater();
-        }
-    });
-    flushAndExitTimer->start();
+    flushLoggerAfterAppStop("Application stopped by user. Flushing remaining messages...\n");
 }
 
 
@@ -456,7 +428,7 @@ void MainWindow::stopModule(const int clientId, const bool logMessage)
             appendSystemMessage(QString("Module %1 manually stopped via Stop Module %1 button.\n").arg(clientId));
         }
         else {
-            appendSystemMessage(QString("CRITICAL message received from module 1. Module 1 auto-stopped.\n").arg(clientId));
+            appendSystemMessage(QString("CRITICAL message received from module %1. Module %1 auto-stopped.\n").arg(clientId));
         }
         switch (clientId){
         case 1:
@@ -473,11 +445,32 @@ void MainWindow::stopModule(const int clientId, const bool logMessage)
         }
         s_moduleStopped[clientId -1] = true;
         if (s_moduleStopped[0] && s_moduleStopped[1] && s_moduleStopped[2]) {
-            appendSystemMessage("The other modules are already stopped so the logger is stopping...\n");
-            m_logger->stop();
-            ui->startModulesButton->setEnabled(true);
+            m_receiver->close();
+            m_logger->applyFlushIntervalAfterAppStopped();
             ui->stopApplicationButton->setEnabled(false);
-            ui->actionSettings->setEnabled(true);
-            killPythonProcess();        }
+            flushLoggerAfterAppStop("The other modules are already stopped so the logger is stopping...\n");
+        }
     }
+}
+
+ void MainWindow::flushLoggerAfterAppStop(const QString & msg)
+{
+    appendSystemMessage(msg);
+    QTimer *flushAndExitTimer = new QTimer(this);
+    flushAndExitTimer->setInterval(m_logger->getLoggerFlushInterval());
+    m_logger->applyFlushIntervalAfterAppStopped();
+    connect(flushAndExitTimer, &QTimer::timeout, this, [this, flushAndExitTimer]() {
+        if (!m_logger->isEmpty()) {
+            m_logger->flushBuffer();  // flush one message
+        } else {
+            appendSystemMessage("Application stopped.\n");
+            ui->startModulesButton->setEnabled(true);
+            ui->actionSettings->setEnabled(true);
+            m_logger->applyFlushInterval();
+            flushAndExitTimer->stop();
+            flushAndExitTimer->deleteLater();
+        }
+    });
+    flushAndExitTimer->start();
+    killPythonProcess();
 }

@@ -17,12 +17,12 @@ public:
     bool isEmpty() const;
     void startNewLogFile();
     void logManualStop(uint32_t moduleId);
-    void stop();
     void setLoggerMaxSize(int const maxSize);
     void setLoggerFlushInterval(int const flushInterval);
     int getLoggerFlushInterval() const;
     int getLoggerMaxSize();
     void applyFlushInterval();
+    void applyFlushIntervalAfterAppStopped();
 
 signals:
     void messageReady(const EventMessage &msg);

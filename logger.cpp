@@ -4,6 +4,10 @@
 #include <QDateTime>
 #include <QCoreApplication>
 
+namespace {
+constexpr int s_flushIntAfterStop {10};
+}
+
 Logger::Logger(QObject *parent)
     : QObject(parent),
     m_maxSize(500),
@@ -15,7 +19,12 @@ Logger::Logger(QObject *parent)
 }
 
 Logger::~Logger() {
-    stop();
+    if (m_logWriter) {
+        m_logWriter->finish();
+        m_logWriter->wait();
+        m_logWriter.reset();
+    }
+    clear();
 }
 
 void Logger::addMessage(const EventMessage &msg) {
@@ -106,14 +115,11 @@ void Logger::logManualStop(uint32_t const moduleId) {
     }
 }
 
-void Logger::stop()
+void Logger::applyFlushIntervalAfterAppStopped()
 {
-    if (m_logWriter) {
-        m_logWriter->finish();
-        m_logWriter->wait();
-        m_logWriter.reset();
-    }
-    clear();
+    m_flushTimer.stop();
+    m_flushTimer.setInterval(s_flushIntAfterStop);
+    m_flushTimer.start();
 }
 
 void Logger::applyFlushInterval()

@@ -49,6 +49,7 @@ private:
     void killPythonProcess();
     void stopModule(const int clientId, const bool logMessage);
     void setSettingDialogValues(Settings &dlg);
+    void flushLoggerAfterAppStop( const QString & msg);
 private:
     Ui::MainWindow *ui;
     // Processing incoming data from data points
