@@ -148,7 +148,6 @@ void EventReceiver::onReadyRead(QTcpSocket* socket)
                 // for the other 2 modules just stop the respective module
                 else {
                     stopClient(msg.clientId);
-                    emit clientStopped(msg.clientId);
                 }
             }
         }

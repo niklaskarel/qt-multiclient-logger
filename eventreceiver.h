@@ -18,7 +18,6 @@ public:
 
 signals:
     void messageReceived(const EventMessage &msg);
-    void clientStopped(int clientId);
 
 protected slots:
     void handleNewConnection();
