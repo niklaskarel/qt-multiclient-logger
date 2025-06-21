@@ -42,7 +42,6 @@ ranges = [
 weights = [r["weight"] for r in ranges]
 
 # State per client variables
-block_module = {1: False, 2: False, 3: False}
 clients = [1, 2, 3]
 sockets = {}
 last_logged_range_per_client = {1: None, 2: None, 3: None}
@@ -64,8 +63,6 @@ def connect_client(client_id):
         return False
 
 def send_message(client_id, msg_type, msg_text):
-    if block_module.get(client_id, False):
-        return
     msg = {
             "type": msg_type,
             "message": msg_text,
@@ -139,11 +136,6 @@ def client_loop(client_id):
                 with lock:
                     if client_id == 3:
                         # shutdown all modules when a critical error for module 3 occurs
-                        for id in active_clients:
-                            block_module[id] = True
-
-                        # application will stop in Qt side, give sometime to close the sockets there before do it here
-                        time.sleep(5)
                         for id in active_clients:
                             active_clients[id] = False
                     else:

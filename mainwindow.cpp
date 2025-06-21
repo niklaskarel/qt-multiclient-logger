@@ -16,7 +16,6 @@ constexpr uint32_t s_criticalModule = 3U;
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
-    m_receiver(new EventReceiver(this)),
     m_watchdogTimer(new QTimer(this)),
     m_logger(new Logger(this)),
     m_pythonProcessManager (new PythonProcessManager(this)),
@@ -25,6 +24,10 @@ MainWindow::MainWindow(QWidget *parent)
     ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+
+    m_receiverThread = new QThread(this);
+    m_receiver = new EventReceiver();
+    m_receiver->moveToThread(m_receiverThread);
 
     m_customPlot = new QCustomPlot(this);
     ui->plotWidget->layout()->addWidget(m_customPlot);
@@ -55,7 +58,10 @@ MainWindow::MainWindow(QWidget *parent)
     ui->stopModule2Button->setEnabled(false);
     ui->stopModule3Button->setEnabled(false);
 
-    connect(m_receiver, &EventReceiver::messageReceived, this, &MainWindow::handleMessage);
+    connect(m_receiver, &EventReceiver::messageReceived, this, &MainWindow::handleMessage, Qt::QueuedConnection);
+    connect(m_receiverThread, &QThread::finished, m_receiver, &QObject::deleteLater);
+    connect(m_receiver, &QObject::destroyed, this, [this]() { m_receiver = nullptr; });
+
     connect(m_logger, &Logger::messageReady, this, &MainWindow::displayMessage);
     connect(ui->actionSettings, &QAction::triggered, this, &MainWindow::onOpenSettings);
 
@@ -70,6 +76,7 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::handleTriggerFinished);
     connect(m_watchdogTimer, &QTimer::timeout, this, &MainWindow::handleWatchdogTimeout);
 
+    m_receiverThread->start();
 }
 
 void MainWindow::onOpenSettings()
@@ -115,9 +122,7 @@ void MainWindow::handleMessage(const EventMessage &msg) {
 
     if (msg.type == "CRITICAL") {
         if (msg.clientId == s_criticalModule) {
-            m_receiver->close();
-            m_receiver->deleteLater();
-            m_receiver = nullptr;
+            shutdownReceiverHard();
             ui->stopModule1Button->setEnabled(false);
             ui->stopModule2Button->setEnabled(false);
             ui->stopModule3Button->setEnabled(false);
@@ -238,9 +243,22 @@ void MainWindow::handleWatchdogTimeout() {
 
 void MainWindow::on_startModulesButton_clicked()
 {
+    bool isReceiverNew {false};
     if (m_receiver == nullptr) {
         m_receiver = new EventReceiver(this);
+        isReceiverNew = true;
         connect(m_receiver, &EventReceiver::messageReceived, this, &MainWindow::handleMessage);
+        connect(m_receiver, &QObject::destroyed, this, [this]() { m_receiver = nullptr; });
+    }
+
+    if (m_receiverThread && !m_receiverThread->isRunning())
+    {
+        if (isReceiverNew)
+        {
+            m_receiver->moveToThread(m_receiverThread);
+            connect(m_receiverThread, &QThread::finished, m_receiver, &QObject::deleteLater);
+        }
+        m_receiverThread->start();
     }
 
     if (!m_receiver->isListening()) {
@@ -281,7 +299,7 @@ void MainWindow::on_stopApplicationButton_clicked()
     }
 
     if (m_receiver->isListening()) {
-        m_receiver->close();
+        shutdownReceiverSoft();
     }
 
     ui->stopModule1Button->setEnabled(false);
@@ -445,7 +463,7 @@ void MainWindow::stopModule(const int clientId, const bool logMessage)
         }
         s_moduleStopped[clientId -1] = true;
         if (s_moduleStopped[0] && s_moduleStopped[1] && s_moduleStopped[2]) {
-            m_receiver->close();
+            shutdownReceiverSoft();
             m_logger->applyFlushIntervalAfterAppStopped();
             ui->stopApplicationButton->setEnabled(false);
             flushLoggerAfterAppStop("The other modules are already stopped so the logger is stopping...\n");
@@ -473,4 +491,21 @@ void MainWindow::stopModule(const int clientId, const bool logMessage)
     });
     flushAndExitTimer->start();
     killPythonProcess();
+}
+
+void MainWindow::shutdownReceiverSoft()
+{
+    if (m_receiver)
+    {
+        QMetaObject::invokeMethod(m_receiver, &EventReceiver::close, Qt::QueuedConnection);
+    }
+}
+
+void MainWindow::shutdownReceiverHard()
+{
+    shutdownReceiverSoft();
+    if (m_receiverThread && m_receiverThread->isRunning()) {
+        m_receiverThread->quit();
+        m_receiverThread->wait();
+    }
 }

@@ -50,6 +50,8 @@ private:
     void stopModule(const int clientId, const bool logMessage);
     void setSettingDialogValues(Settings &dlg);
     void flushLoggerAfterAppStop( const QString & msg);
+    void shutdownReceiverSoft();
+    void shutdownReceiverHard();
 private:
     Ui::MainWindow *ui;
     // Processing incoming data from data points
@@ -65,7 +67,9 @@ private:
 
     // Message Handlers
     Logger *m_logger;
+
     EventReceiver *m_receiver;
+    QThread *m_receiverThread;
 
     // timers for the poitns ploting and logging
     QTimer *m_watchdogTimer;

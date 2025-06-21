@@ -8,9 +8,15 @@
 #include <QDateTime>
 
 EventReceiver::EventReceiver(QObject *parent)
-    : QTcpServer(parent)
+    : QObject(parent),
+    m_server(new QTcpServer(this))
 {
-    connect(this, &QTcpServer::newConnection, this, &EventReceiver::handleNewConnection);
+    connect(m_server, &QTcpServer::newConnection, this, &EventReceiver::handleNewConnection);
+}
+
+bool EventReceiver::listen (const QHostAddress &address, const uint16_t port)
+{
+      return m_server->listen(address, port);
 }
 
 void EventReceiver::close()
@@ -29,14 +35,16 @@ void EventReceiver::close()
             }
         }
     }
-    m_clients.clear();
-    QTcpServer::close();
+    m_clients.clear();    
+    if (m_server->isListening()){
+        m_server->close();
+    }
 }
 
 void EventReceiver::handleNewConnection()
 {
-    while (hasPendingConnections()) {
-        QTcpSocket *clientSocket = nextPendingConnection();
+    while (m_server->hasPendingConnections()) {
+        QTcpSocket *clientSocket = m_server->nextPendingConnection();
         if (!clientSocket) continue;
 
         connect(clientSocket, &QTcpSocket::readyRead, this, [this, clientSocket]() {
@@ -52,6 +60,11 @@ void EventReceiver::handleNewConnection()
             clientSocket->deleteLater();
         });
     }
+}
+
+bool EventReceiver::isListening() const
+{
+    return m_server->isListening();
 }
 
 void EventReceiver::onReadyRead(QTcpSocket* socket)
@@ -135,9 +148,16 @@ void EventReceiver::onReadyRead(QTcpSocket* socket)
                 {
                     for (QTcpSocket* s : m_clients) {
                         if (s) {
-                            // s->disconnect();
+                            connect(s, &QTcpSocket::disconnected, s, &QTcpSocket::deleteLater);
                             s->disconnectFromHost();
-                            s->deleteLater();
+
+                            // delete the socket abdurtply if danglisng
+                            QTimer::singleShot(3000, s, [s]() {
+                                if (s->state() != QAbstractSocket::UnconnectedState) {
+                                    s->abort();
+                                    s->deleteLater();
+                                }
+                            });
                         }
                     }
                     // Defer the map cleanup
