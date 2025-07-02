@@ -1,6 +1,6 @@
 # Qt Multi-Client TCP Logger
 
-This ongoing project is a Qt-based application that functions as a TCP server designed to handle up to three concurrent clients (modules), each sending structured JSON messages over TCP. It features real-time message logging, GUI-based controls, error-handling mechanisms tailored for critical communication systems or monitoring tools and Writer that currently writes to a single session log file, with module identifiers included in each entry for traceability; advanced options are part of the ongoing development roadmap. It also displaysa basi graph using QCustomPlot of the incoming data points after some basic thresholding and filtering.
+This ongoing project is a Qt-based application that functions as a TCP server designed to handle up to three concurrent clients (modules), each sending structured JSON messages over TCP. It features real-time message logging, GUI-based controls, error-handling mechanisms tailored for critical communication systems or monitoring tools and Writer that currently writes to a single session log file, with module identifiers included in each entry for traceability; advanced options are part of the ongoing development roadmap. It also displays a basic graph using QCustomPlot of the incoming data points after some basic thresholding and filtering.
 
 ## Features
 
@@ -62,7 +62,7 @@ MIT License (or specify yours)
 ~~As of 13/6/2025 The application crashes when the python script generates a critical error for module 3~~
 Fixed on 17/6/2025: Crash caused by improper deletion of client sockets on CRITICAL messages from module 3 was resolved.
 18/6/2025 Python proccess crashed when closing after a critical error in module 3.
-          INFO, WARNING, ERROR messages are not displayex after a few seconds on the logger, only the DATA messages.
+          INFO, WARNING, ERROR messages are not displayed after a few seconds on the logger, only the DATA messages.
 
 ---
 
@@ -79,7 +79,7 @@ Feel free to adapt, extend, or integrate this logger with your own backend or UI
   - This includes manual JSON serialization/parsing and potential integration with PostgreSQL for durable log storage.
 - ~~Refactor EventReceiver to use QThread per client socket to improve stability and avoid crashes due to cross-thread access or unexpected deletions. Current design using QTcpServer in the main thread is fragile under high traffic~~ Done in 21.06.2025
 - Refactor Logger to run in its own thread to handle high-throughput message processing.
-- Current architecture is tightly coupled: MainWindow handles transport and control logic. Refactoring planned to introduce an EventOrchestrator for better separation of concerns (UI vs. logic vs. transport).
+- Current architecture is functional but has tightly coupling between UI and control logic. Refactoring planned to introduce an EventOrchestrator for better separation of concerns (UI vs. logic vs. transport).
 - Add QCustomPlot as a dynamic library and not as a static as it is increasing the time for building.
 - Add support for **MQTT** as a communication method between system components, using a publish/subscribe architecture via an MQTT broker
 - Add second way of messaging formating (f.e **XML**, **Protobuf**)
