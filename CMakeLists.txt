@@ -29,6 +29,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         dataprocessor.h dataprocessor.cpp
         3rdPartyLibraries/QCustomPlot/qcustomplot.cpp 3rdPartyLibraries/QCustomPlot/qcustomplot.h
         pythonprocessmanager.h pythonprocessmanager.cpp
+        controller.h controller.cpp
 
     )
 # Define target properties for Android with Qt 6 as:

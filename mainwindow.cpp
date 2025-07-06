@@ -4,8 +4,6 @@
 #include <QRegularExpression>
 #include <QDebug>
 
-#include "logger.h"
-#include "eventreceiver.h"
 #include "settings.h"
 #include "ui_mainwindow.h"
 
@@ -16,18 +14,11 @@ constexpr uint32_t s_criticalModule = 3U;
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
+    m_controller{std::make_unique<Controller>(this)},
     m_watchdogTimer(new QTimer(this)),
-    m_logger(new Logger(this)),
-    m_pythonProcessManager (new PythonProcessManager(this)),
-    m_ipAddress{"127.0.0.1"},
-    m_localPort(1024),
     ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-
-    m_receiverThread = new QThread(this);
-    m_receiver = new EventReceiver();
-    m_receiver->moveToThread(m_receiverThread);
 
     m_customPlot = new QCustomPlot(this);
     ui->plotWidget->layout()->addWidget(m_customPlot);
@@ -58,50 +49,26 @@ MainWindow::MainWindow(QWidget *parent)
     ui->stopModule2Button->setEnabled(false);
     ui->stopModule3Button->setEnabled(false);
 
-    connect(m_receiver, &EventReceiver::messageReceived, this, &MainWindow::handleMessage, Qt::QueuedConnection);
-    connect(m_receiverThread, &QThread::finished, m_receiver, &QObject::deleteLater);
-    connect(m_receiver, &QObject::destroyed, this, [this]() { m_receiver = nullptr; });
-
-    connect(m_logger, &Logger::messageReady, this, &MainWindow::displayMessage);
+    connect(m_controller.get(), &Controller::modulesStarted, this, &MainWindow::modulesStarted);
+    connect(m_controller.get(), &Controller::newMessage, this, &MainWindow::handleMessage, Qt::QueuedConnection);
+    connect(m_controller.get(), &Controller::displayMessage, this, &MainWindow::displayMessage);
     connect(ui->actionSettings, &QAction::triggered, this, &MainWindow::onOpenSettings);
+    connect(m_controller.get(), &Controller::moduleStopped, this, &MainWindow::stopModule);
+    connect(m_controller.get(), &Controller::systemMessage, this, &MainWindow::appendSystemMessage);
+    connect(m_controller.get(), &Controller::loggerFlushedAfterStop, this, &MainWindow::loggerFlushedAfterStop);
 
     m_watchdogTimer->setInterval(10000);
-    connect(m_pythonProcessManager, &PythonProcessManager::triggerOutput,
-            this, &MainWindow::handleTriggerOutput);
-    connect(m_pythonProcessManager, &PythonProcessManager::triggerError,
-            this, &MainWindow::handleTriggerError);
-    connect(m_pythonProcessManager, &PythonProcessManager::triggerCrashed,
-            this, &MainWindow::handleTriggerCrashed);
-    connect(m_pythonProcessManager, &PythonProcessManager::triggerFinished,
-            this, &MainWindow::handleTriggerFinished);
     connect(m_watchdogTimer, &QTimer::timeout, this, &MainWindow::handleWatchdogTimeout);
-
-    m_receiverThread->start();
 }
 
 void MainWindow::onOpenSettings()
 {
     Settings dlg(this);
-    setSettingDialogValues(dlg);
+    m_controller->setSettingsOnDialog(dlg);
     if (dlg.exec() == QDialog::Accepted)
     {
-        onSettingsChanged(dlg);
+         m_controller->applySettings(dlg);
     }
-}
-
-void  MainWindow::setSettingDialogValues(Settings &dlg)
-{
-    // all data processors have the same parameters
-    double const lower = m_processorModule1.getLowerThreshold();
-    double const upper = m_processorModule1.getUpperThreshold();
-    int const windowSize = m_processorModule1.getWindowSize();
-    double const plotWindowSec = m_processorModule1.getPlotTimeWindow();
-
-    // Logger settings
-    int const ringBufferSize = m_logger->getLoggerMaxSize();
-    int const flushInterval = m_logger->getLoggerFlushInterval();
-    dlg.loadSettings(m_ipAddress, m_localPort,lower, upper, plotWindowSec, windowSize, flushInterval, ringBufferSize);
-
 }
 
 void MainWindow::appendSystemMessage(QString const & msg)
@@ -116,25 +83,17 @@ void MainWindow::appendSystemMessage(QString const & msg)
     ui->logTextEdit->setTextCursor(cursor);
 }
 
-void MainWindow::handleMessage(const EventMessage &msg) {
+void MainWindow::handleMessage(const uint32_t clientId, const Controller::MessageType msgType) {
     m_watchdogTimer->start();
-    m_logger->addMessage(msg);
 
-    if (msg.type == "CRITICAL") {
-        if (msg.clientId == s_criticalModule) {
-            shutdownReceiverHard();
-            ui->stopModule1Button->setEnabled(false);
-            ui->stopModule2Button->setEnabled(false);
-            ui->stopModule3Button->setEnabled(false);
-            ui->stopApplicationButton->setEnabled(false);
-            s_moduleStopped = {true, true, true};
-            flushLoggerAfterAppStop("CRITICAL message received from module 3. Logger auto-stopped.\n");
-        }
-        else{
-            stopModule(msg.clientId, false);
-        }
-    } else if (msg.type == "ERROR") {
-        switch (msg.clientId){
+    if (msgType == Controller::MessageType::CRITICAL) {
+        ui->stopModule1Button->setEnabled(false);
+        ui->stopModule2Button->setEnabled(false);
+        ui->stopModule3Button->setEnabled(false);
+        ui->stopApplicationButton->setEnabled(false);
+        s_moduleStopped = {true, true, true};
+    } else if (msgType ==  Controller::MessageType::ERROR) {
+        switch (clientId){
         case 1: {
             if (!s_moduleStopped[0]) {
                 ui->stopModule1Button->setEnabled(true);
@@ -162,26 +121,11 @@ void MainWindow::handleMessage(const EventMessage &msg) {
         default:
             break;
         }
-        if (!s_errorNotified[msg.clientId - 1]) {
-            s_errorNotified[msg.clientId - 1] = true;
-            QMetaObject::invokeMethod(this, [this, msg]() {
-                QMessageBox::information(this, "Error Received", QString("An error occurred for module %1. You may now stop the logger manually.\n" ).arg(msg.clientId));
+        if (!s_errorNotified[clientId - 1 && !s_moduleStopped[clientId - 1]]) {
+            s_errorNotified[clientId - 1] = true;
+            QMetaObject::invokeMethod(this, [this, clientId]() {
+                QMessageBox::information(this, "Error Received", QString("An error occurred for module %1. You may now stop the logger manually.\n" ).arg(clientId));
             }, Qt::QueuedConnection);
-        }
-    }
-    else if (msg.type == "DATA") {
-        qDebug() << "Received DATA:" << msg.text << "from client" << msg.clientId;
-        QRegularExpression regex("value:(\\d+\\.\\d+)");
-        QRegularExpressionMatch match = regex.match(msg.text);
-        if (match.hasMatch()) {
-            double value = match.captured(1).toDouble();
-            if (msg.clientId == 1) {
-                m_processorModule1.addSample(value, msg.timestamp);
-            } else if (msg.clientId == 2) {
-                m_processorModule2.addSample(value, msg.timestamp);
-            } else if (msg.clientId == 3) {
-                m_processorModule3.addSample(value, msg.timestamp);
-            }
         }
     }
 }
@@ -241,52 +185,28 @@ void MainWindow::handleWatchdogTimeout() {
     appendSystemMessage("No message received in the last 10 seconds.\n");
 }
 
+void MainWindow::modulesStarted()
+{
+    ui->startModulesButton->setEnabled(false);
+    ui->stopApplicationButton->setEnabled(true);
+    s_errorNotified = {false, false, false};
+    s_moduleStopped = {false, false, false};
+    m_watchdogTimer->start();
+    ui->actionSettings->setEnabled(false);
+}
+
 void MainWindow::on_startModulesButton_clicked()
 {
-    bool isReceiverNew {false};
-    if (m_receiver == nullptr) {
-        m_receiver = new EventReceiver(this);
-        isReceiverNew = true;
-        connect(m_receiver, &EventReceiver::messageReceived, this, &MainWindow::handleMessage);
-        connect(m_receiver, &QObject::destroyed, this, [this]() { m_receiver = nullptr; });
-    }
-
-    if (m_receiverThread && !m_receiverThread->isRunning())
+    if (!m_controller->startModules())
     {
-        if (isReceiverNew)
-        {
-            m_receiver->moveToThread(m_receiverThread);
-            connect(m_receiverThread, &QThread::finished, m_receiver, &QObject::deleteLater);
-        }
-        m_receiverThread->start();
-    }
-
-    if (!m_receiver->isListening()) {
-        if (m_receiver->listen(QHostAddress{m_ipAddress}, m_localPort)) {
-            m_logger->startNewLogFile();
-            appendSystemMessage(QString("Server started on port %1\n").arg(m_localPort));
-            ui->startModulesButton->setEnabled(false);
-            ui->stopApplicationButton->setEnabled(true);
-            s_errorNotified = {false, false, false};
-            s_moduleStopped = {false, false, false};
-            m_watchdogTimer->start();
-
-            QTimer::singleShot(1000, this, &MainWindow::startPythonProcess);
-            ui->actionSettings->setEnabled(false);
-
-        } else {
-            QMessageBox::critical(this, "Error", QString("Failed to start TCP server at port %1.\n").arg(m_localPort));
-        }
-    }
-    else {
-        qWarning("This should never come!");
+        QMessageBox::critical(this, "Error", QString("Failed to start TCP server at port %1.\n").arg(m_controller->getLocalPort()));
     }
 }
 
 
 void MainWindow::on_stopApplicationButton_clicked()
 {
-    if (m_receiver == nullptr) {
+    if (!m_controller->stopApplication()) {
         // this code should never reached!
         qDebug() << "tried to stop the application after the modules are stopped";
         ui->stopApplicationButton->setEnabled(false);
@@ -298,17 +218,11 @@ void MainWindow::on_stopApplicationButton_clicked()
         return;
     }
 
-    if (m_receiver->isListening()) {
-        shutdownReceiverSoft();
-    }
-
     ui->stopModule1Button->setEnabled(false);
     ui->stopModule2Button->setEnabled(false);
     ui->stopModule3Button->setEnabled(false);
     ui->stopApplicationButton->setEnabled(false);
     s_moduleStopped = {true, true, true};
-
-    flushLoggerAfterAppStop("Application stopped by user. Flushing remaining messages...\n");
 }
 
 
@@ -320,63 +234,27 @@ void MainWindow::on_clearButton_clicked()
 
 void MainWindow::on_stopModule1Button_clicked()
 {
-    stopModule(1, true);
+    m_controller->stopModule(1, true);
 }
 
 
 void MainWindow::on_stopModule2Button_clicked()
 {
-    stopModule(2, true);
+    m_controller->stopModule(2, true);
 }
 
 void MainWindow::on_stopModule3Button_clicked()
 {
-    stopModule(3, true);
-}
-
-void MainWindow::onSettingsChanged(const Settings & settings)
-{
-    // Data processor settings
-    double const lower = settings.getLowerThreshold();
-    double const upper = settings.getUpperThreshold();
-    int const windowSize = settings.getNumSamplesToAvg();
-    double const plotWindowSec = settings.getPlotTime();
-
-    m_processorModule1.setThresholds(lower, upper);
-    m_processorModule2.setThresholds(lower, upper);
-    m_processorModule3.setThresholds(lower, upper);
-
-    m_processorModule1.setWindowSize(windowSize);
-    m_processorModule2.setWindowSize(windowSize);
-    m_processorModule3.setWindowSize(windowSize);
-
-    m_processorModule1.setPlotTimeWindowSec(plotWindowSec);
-    m_processorModule2.setPlotTimeWindowSec(plotWindowSec);
-    m_processorModule3.setPlotTimeWindowSec(plotWindowSec);
-
-    // TCP connection settings
-    int const localPort = settings.getTcpPort();
-    QString const ipAddress = settings.getIpAddress();
-
-    m_localPort = localPort;
-    m_ipAddress = ipAddress;
-
-    // Logger settings
-    int const maxSize = settings.getRingBufferSize();
-    int const flushInterval = settings.getFlushInterval();
-
-    m_logger->setLoggerMaxSize(maxSize);
-    m_logger->setLoggerFlushInterval(flushInterval);
-    m_logger->applyFlushInterval();
+    m_controller->stopModule(3, true);
 }
 
 void MainWindow::updatePlot()
 {
     QDateTime currentTime = QDateTime::currentDateTime();
 
-    QVector<QPointF> data1 = m_processorModule1.getProcessedCurve(currentTime);
-    QVector<QPointF> data2 = m_processorModule2.getProcessedCurve(currentTime);
-    QVector<QPointF> data3 = m_processorModule3.getProcessedCurve(currentTime);
+    QVector<QPointF> data1 = m_controller->getProcessedCurve(0, currentTime);
+    QVector<QPointF> data2 = m_controller->getProcessedCurve(1, currentTime);
+    QVector<QPointF> data3 = m_controller->getProcessedCurve(2, currentTime);
 
     m_graphModule1->setData(QVector<double>(), QVector<double>());
     m_graphModule2->setData(QVector<double>(), QVector<double>());
@@ -401,111 +279,42 @@ void MainWindow::updatePlot()
     m_graphModule2->setData(x2, y2);
     m_graphModule3->setData(x3, y3);
 
-    double windowSec = m_processorModule1.getPlotTimeWindowSec();
+    double windowSec = m_controller->getPlotTimeWindow();
     m_customPlot->xAxis->setRange(-windowSec, 0);
     m_customPlot->yAxis->setRange(0,100);
     m_customPlot->replot();
 }
 
-void MainWindow::startPythonProcess()
+void MainWindow::stopModule(const int clientId, const bool logMessage, const bool stopApplication)
 {
-    m_pythonProcessManager->start(m_ipAddress, m_localPort);
-}
-
-void MainWindow::killPythonProcess()
-{
-    m_pythonProcessManager->stop();
-}
-
-void MainWindow::handleTriggerOutput(const QString &line)
-{
-    qDebug() << "[Python stdout]:" << line;
-}
-
-void MainWindow::handleTriggerError(const QString &error)
-{
-     qWarning() << "[Python stderr]:" << error;
-}
-
-void MainWindow::handleTriggerCrashed()
-{
-    qCritical() << "Python process crashed!";
-}
-
-void MainWindow::handleTriggerFinished(int exitCode)
-{
-     qDebug() << "Python process finished with exit code:" << exitCode;
-}
-
-void MainWindow::stopModule(const int clientId, const bool logMessage)
-{
-    if (m_receiver->isListening()) {
-        m_receiver->stopClient(clientId);
-        m_logger->logManualStop(clientId);
-        if(logMessage){
-            appendSystemMessage(QString("Module %1 manually stopped via Stop Module %1 button.\n").arg(clientId));
-        }
-        else {
-            appendSystemMessage(QString("CRITICAL message received from module %1. Module %1 auto-stopped.\n").arg(clientId));
-        }
-        switch (clientId){
-        case 1:
-            ui->stopModule1Button->setEnabled(false);
-            break;
-        case 2:
-            ui->stopModule2Button->setEnabled(false);
-            break;
-        case 3:
-            ui->stopModule3Button->setEnabled(false);
-            break;
-        default:
-            break;
-        }
-        s_moduleStopped[clientId -1] = true;
-        if (s_moduleStopped[0] && s_moduleStopped[1] && s_moduleStopped[2]) {
-            shutdownReceiverSoft();
-            m_logger->applyFlushIntervalAfterAppStopped();
-            ui->stopApplicationButton->setEnabled(false);
-            flushLoggerAfterAppStop("The other modules are already stopped so the logger is stopping...\n");
-        }
+    s_moduleStopped[clientId -1] = true;
+    if(logMessage){
+        appendSystemMessage(QString("Module %1 manually stopped via Stop Module %1 button.\n").arg(clientId));
     }
-}
-
- void MainWindow::flushLoggerAfterAppStop(const QString & msg)
-{
-    appendSystemMessage(msg);
-    QTimer *flushAndExitTimer = new QTimer(this);
-    flushAndExitTimer->setInterval(m_logger->getLoggerFlushInterval());
-    m_logger->applyFlushIntervalAfterAppStopped();
-    connect(flushAndExitTimer, &QTimer::timeout, this, [this, flushAndExitTimer]() {
-        if (!m_logger->isEmpty()) {
-            m_logger->flushBuffer();  // flush one message
-        } else {
-            appendSystemMessage("Application stopped.\n");
-            ui->startModulesButton->setEnabled(true);
-            ui->actionSettings->setEnabled(true);
-            m_logger->applyFlushInterval();
-            flushAndExitTimer->stop();
-            flushAndExitTimer->deleteLater();
-        }
-    });
-    flushAndExitTimer->start();
-    killPythonProcess();
-}
-
-void MainWindow::shutdownReceiverSoft()
-{
-    if (m_receiver)
+    else {
+        appendSystemMessage(QString("CRITICAL message received from module %1. Module %1 auto-stopped.\n").arg(clientId));
+    }
+    switch (clientId){
+    case 1:
+        ui->stopModule1Button->setEnabled(false);
+        break;
+    case 2:
+        ui->stopModule2Button->setEnabled(false);
+        break;
+    case 3:
+        ui->stopModule3Button->setEnabled(false);
+        break;
+    default:
+        break;
+    }
+    if (stopApplication)
     {
-        QMetaObject::invokeMethod(m_receiver, &EventReceiver::close, Qt::QueuedConnection);
+        ui->stopApplicationButton->setEnabled(false);
     }
 }
 
-void MainWindow::shutdownReceiverHard()
+void MainWindow::loggerFlushedAfterStop()
 {
-    shutdownReceiverSoft();
-    if (m_receiverThread && m_receiverThread->isRunning()) {
-        m_receiverThread->quit();
-        m_receiverThread->wait();
-    }
+    ui->startModulesButton->setEnabled(true);
+    ui->actionSettings->setEnabled(true);
 }

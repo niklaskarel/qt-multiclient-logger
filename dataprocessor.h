@@ -16,15 +16,14 @@ public:
     void setPlotTimeWindowSec(const double seconds);
 
     // getters
-    double getLowerThreshold();
-    double getUpperThreshold();
-    int getWindowSize();
-    double getPlotTimeWindow();
+    double getLowerThreshold() const;
+    double getUpperThreshold() const;
+    int getWindowSize() const;
+    double getPlotTimeWindow() const;
 
     void addSample(const double value, QDateTime timestamp);
 
     QVector<QPointF> getProcessedCurve(QDateTime currentTime);
-    double getPlotTimeWindowSec() const { return m_plotTimeWindowSec; }
 
 private:
     struct Sample {

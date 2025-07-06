@@ -5,6 +5,7 @@
 #include <QTcpSocket>
 #include <QHostAddress>
 #include <QMap>
+#include <QPointer>
 #include "eventmessage.h"
 
 
@@ -23,12 +24,12 @@ signals:
 
 protected slots:
     void handleNewConnection();
-    void onReadyRead(QTcpSocket *socket);
+    void onReadyRead(QPointer<QTcpSocket> socket);
 
 private:
-    QTcpServer *m_server;
-    QMap<uint32_t, QTcpSocket*> m_clients;
-    QMap<QTcpSocket*, QByteArray> m_pendingBuffers;
+    std::unique_ptr<QTcpServer> m_server;
+    QMap<uint32_t, QPointer<QTcpSocket>> m_clients;
+    QMap<QPointer<QTcpSocket>, QByteArray> m_pendingBuffers;
 };
 
 #endif // EVENTRECEIVER_H

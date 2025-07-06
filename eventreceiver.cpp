@@ -7,16 +7,25 @@
 #include <QTimer>
 #include <QDateTime>
 
+
 EventReceiver::EventReceiver(QObject *parent)
-    : QObject(parent),
-    m_server(new QTcpServer(this))
+    : QObject(parent)
 {
-    connect(m_server, &QTcpServer::newConnection, this, &EventReceiver::handleNewConnection);
 }
 
 bool EventReceiver::listen (const QHostAddress &address, const uint16_t port)
 {
-      return m_server->listen(address, port);
+    if (!m_server) {
+        bool success {false};
+        QMetaObject::invokeMethod(this, [this, address, port, &success] {
+            m_server = std::make_unique<QTcpServer>(this); // Now constructed in the correct thread
+            connect(m_server.get(), &QTcpServer::newConnection, this, &EventReceiver::handleNewConnection);
+            success = m_server->listen(address, port);
+        }, Qt::BlockingQueuedConnection);
+        return success;
+    }
+
+    return m_server->listen(address, port);
 }
 
 void EventReceiver::close()
@@ -35,9 +44,11 @@ void EventReceiver::close()
             }
         }
     }
-    m_clients.clear();    
+    m_clients.clear();
+    m_pendingBuffers.clear();
     if (m_server->isListening()){
         m_server->close();
+        m_server.reset();
     }
 }
 
@@ -47,27 +58,30 @@ void EventReceiver::handleNewConnection()
         QTcpSocket *clientSocket = m_server->nextPendingConnection();
         if (!clientSocket) continue;
 
-        connect(clientSocket, &QTcpSocket::readyRead, this, [this, clientSocket]() {
-            onReadyRead(clientSocket);
+        connect(clientSocket, &QTcpSocket::readyRead, this, [this]() {
+            QPointer<QTcpSocket> sock = qobject_cast<QTcpSocket*>(sender());
+            onReadyRead(sock);
         });
 
-        connect(clientSocket, &QTcpSocket::disconnected, this, [this, clientSocket]() {
-            const int clientKey = m_clients.key(clientSocket, -1);
+        connect(clientSocket, &QTcpSocket::disconnected, this, [this]() {
+            QPointer<QTcpSocket> sock = qobject_cast<QTcpSocket*>(sender());
+            if (!sock) return;
+            const int clientKey = m_clients.key(sock, -1);
             if (clientKey != -1) {
                 m_clients.remove(clientKey);
             }
-             m_pendingBuffers.remove(clientSocket);
-            clientSocket->deleteLater();
+            m_pendingBuffers.remove(sock);
+            sock->deleteLater();
         });
     }
 }
 
 bool EventReceiver::isListening() const
 {
-    return m_server->isListening();
+    return m_server && m_server->isListening();
 }
 
-void EventReceiver::onReadyRead(QTcpSocket* socket)
+void EventReceiver::onReadyRead(QPointer<QTcpSocket> socket)
 {
     if (!socket) {
         qDebug() << "onReadyRead called but sender() was null!";
@@ -77,8 +91,9 @@ void EventReceiver::onReadyRead(QTcpSocket* socket)
     try {
         QByteArray data = socket->readAll();
         if (data.isEmpty()) return;
-        if (!m_pendingBuffers.contains(socket))
+        if (!m_pendingBuffers.contains(socket)) {
             m_pendingBuffers[socket] = QByteArray();
+        }
         m_pendingBuffers[socket].append(data);
         while (true)
         {
@@ -146,14 +161,19 @@ void EventReceiver::onReadyRead(QTcpSocket* socket)
             if ((msg.type == "CRITICAL")) {
                 if (msg.clientId == 3)
                 {
-                    for (QTcpSocket* s : m_clients) {
+                    if (m_clients.empty()) {
+                        qCritical("All clients are already deleted!");
+                        return;
+                    }
+                    QList<QPointer<QTcpSocket>> sockets = m_clients.values();
+                    for (auto s : sockets) {
                         if (s) {
                             connect(s, &QTcpSocket::disconnected, s, &QTcpSocket::deleteLater);
                             s->disconnectFromHost();
 
-                            // delete the socket abdurtply if danglisng
-                            QTimer::singleShot(3000, s, [s]() {
-                                if (s->state() != QAbstractSocket::UnconnectedState) {
+                            // delete the socket abruptly if danglisng
+                            QTimer::singleShot(3000, this, [s]() {
+                                if (s && (s->state() != QAbstractSocket::UnconnectedState)) {
                                     s->abort();
                                     s->deleteLater();
                                 }
@@ -163,6 +183,7 @@ void EventReceiver::onReadyRead(QTcpSocket* socket)
                     // Defer the map cleanup
                     QTimer::singleShot(1000, this, [this]() {
                         m_clients.clear();
+                        m_pendingBuffers.clear();
                     });
                 }
                 // for the other 2 modules just stop the respective module
@@ -183,9 +204,11 @@ void EventReceiver::onReadyRead(QTcpSocket* socket)
 void EventReceiver::stopClient(uint32_t clientId)
 {
     if (m_clients.contains(clientId)) {
-        QTcpSocket *socket = m_clients[clientId];
+        QPointer<QTcpSocket> socket = m_clients[clientId];
+        if (!socket) return;
+        connect(socket, &QTcpSocket::disconnected, socket, &QTcpSocket::deleteLater);
         socket->disconnectFromHost();
-        socket->deleteLater();
         m_clients.remove(clientId);
+        m_pendingBuffers.remove(socket);
     }
 }

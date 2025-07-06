@@ -8,6 +8,7 @@
 #include "pythonprocessmanager.h"
 #include "dataprocessor.h"
 #include "qcustomplot.h"
+#include "controller.h"
 
 
 QT_BEGIN_NAMESPACE
@@ -25,7 +26,8 @@ public:
     ~MainWindow() = default;
 
 private slots:
-    void handleMessage(const EventMessage &msg);
+    void modulesStarted();
+    void handleMessage(const uint32_t clientId, const Controller::MessageType msgType);
     void displayMessage(const EventMessage &msg);
     void handleWatchdogTimeout();
     void on_startModulesButton_clicked();
@@ -35,25 +37,14 @@ private slots:
     void on_stopModule2Button_clicked();
     void on_stopModule3Button_clicked();
     void onOpenSettings();
-    void onSettingsChanged(const Settings& settings);
     void updatePlot();
-    // Python script handling slots
-    void handleTriggerOutput(const QString &line);
-    void handleTriggerError(const QString &error);
-    void handleTriggerCrashed();
-    void handleTriggerFinished(int exitCode);
+    void stopModule(const int clientId, const bool logMessage, const bool stopApplication);
+    void appendSystemMessage(QString const & msg);
+    void loggerFlushedAfterStop();
 
 private:
-    void appendSystemMessage(QString const & msg);
-    void startPythonProcess();
-    void killPythonProcess();
-    void stopModule(const int clientId, const bool logMessage);
-    void setSettingDialogValues(Settings &dlg);
-    void flushLoggerAfterAppStop( const QString & msg);
-    void shutdownReceiverSoft();
-    void shutdownReceiverHard();
-private:
     Ui::MainWindow *ui;
+    std::unique_ptr<Controller> m_controller;
     // Processing incoming data from data points
     DataProcessor m_processorModule1;
     DataProcessor m_processorModule2;
@@ -65,19 +56,8 @@ private:
     QCPGraph *m_graphModule2;
     QCPGraph *m_graphModule3;
 
-    // Message Handlers
-    Logger *m_logger;
-
-    EventReceiver *m_receiver;
-    QThread *m_receiverThread;
-
     // timers for the poitns ploting and logging
     QTimer *m_watchdogTimer;
     QTimer *m_plotUpdateTimer;
-
-    PythonProcessManager * m_pythonProcessManager;
-
-    QString m_ipAddress;
-    int m_localPort;
 };
 #endif // MAINWINDOW_H

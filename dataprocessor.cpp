@@ -25,22 +25,22 @@ void DataProcessor::setPlotTimeWindowSec(const double seconds)
     m_plotTimeWindowSec = seconds;
 }
 
-double DataProcessor::getLowerThreshold()
+double DataProcessor::getLowerThreshold() const
 {
     return m_lowerThreshold;
 }
 
-double DataProcessor::getUpperThreshold()
+double DataProcessor::getUpperThreshold() const
 {
     return m_upperThreshold;
 }
 
-int DataProcessor::getWindowSize()
+int DataProcessor::getWindowSize() const
 {
     return m_windowSize;
 }
 
-double DataProcessor::getPlotTimeWindow()
+double DataProcessor::getPlotTimeWindow() const
 {
     return m_plotTimeWindowSec;
 }
