@@ -121,8 +121,13 @@ void MainWindow::handleMessage(const uint32_t clientId, const Controller::Messag
         default:
             break;
         }
-        if (!s_errorNotified[clientId - 1 && !s_moduleStopped[clientId - 1]]) {
-            s_errorNotified[clientId - 1] = true;
+        if (!s_errorNotified[clientId - 1]) {            
+            if (clientId == s_criticalModule) {
+                s_errorNotified = {true, true, true};
+            }
+            else {
+               s_errorNotified[clientId - 1] = true;     
+            }
             QMetaObject::invokeMethod(this, [this, clientId]() {
                 QMessageBox::information(this, "Error Received", QString("An error occurred for module %1. You may now stop the logger manually.\n" ).arg(clientId));
             }, Qt::QueuedConnection);
@@ -222,6 +227,8 @@ void MainWindow::on_stopApplicationButton_clicked()
     ui->stopModule2Button->setEnabled(false);
     ui->stopModule3Button->setEnabled(false);
     ui->stopApplicationButton->setEnabled(false);
+    ui->startModulesButton->setEnabled(true);
+    ui->actionSettings->setEnabled(true);
     s_moduleStopped = {true, true, true};
 }
 
