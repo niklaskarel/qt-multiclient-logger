@@ -4,11 +4,11 @@
 #include <QMainWindow>
 #include <QTimer>
 #include <QProcess>
-#include "eventreceiver.h"
-#include "pythonprocessmanager.h"
+#include <QOpenGLWidget>
 #include "dataprocessor.h"
 #include "qcustomplot.h"
 #include "controller.h"
+#include "opengl3dplot.h"
 
 
 QT_BEGIN_NAMESPACE
@@ -37,10 +37,15 @@ private slots:
     void on_stopModule2Button_clicked();
     void on_stopModule3Button_clicked();
     void onOpenSettings();
-    void updatePlot();
+    void updatePlot2D();
+    void updatePlot3D();
     void stopModule(const int clientId, const bool logMessage, const bool stopApplication);
     void appendSystemMessage(QString const & msg);
     void loggerFlushedAfterStop();
+
+    void on_rB2DPlot_toggled(bool checked);
+
+    void on_rB3DPlot_toggled(bool checked);
 
 private:
     Ui::MainWindow *ui;
@@ -50,14 +55,18 @@ private:
     DataProcessor m_processorModule2;
     DataProcessor m_processorModule3;
 
-    //
+    //2D Plot
     QCustomPlot *m_customPlot;
     QCPGraph *m_graphModule1;
     QCPGraph *m_graphModule2;
     QCPGraph *m_graphModule3;
 
+    // 3D Plot
+    OpenGL3DPlot *m_glPlot = nullptr;
+
     // timers for the poitns ploting and logging
     QTimer *m_watchdogTimer;
-    QTimer *m_plotUpdateTimer;
+    QTimer *m_plot2DUpdateTimer;
+    QTimer *m_plot3DUpdateTimer;
 };
 #endif // MAINWINDOW_H

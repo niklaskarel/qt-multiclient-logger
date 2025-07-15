@@ -68,13 +68,58 @@
     <item>
      <widget class="QSplitter" name="splitter_main">
       <property name="orientation">
-       <enum>Qt::Horizontal</enum>
+       <enum>Qt::Orientation::Horizontal</enum>
       </property>
       <property name="handleWidth">
        <number>6</number>
       </property>
       <widget class="QWidget" name="plotWidget">
-       <layout class="QVBoxLayout" name="plotLayout"/>
+       <layout class="QVBoxLayout" name="plotLayout">
+        <item>
+         <widget class="QStackedWidget" name="plotStackedModeWidget">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+            <horstretch>0</horstretch>
+            <verstretch>1</verstretch>
+           </sizepolicy>
+          </property>
+          <widget class="QWidget" name="page2DPlot"/>
+          <widget class="QWidget" name="page3DPlot"/>
+         </widget>
+        </item>
+        <item>
+         <widget class="QWidget" name="plotModeWidget" native="true">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="minimumSize">
+           <size>
+            <width>100</width>
+            <height>50</height>
+           </size>
+          </property>
+          <layout class="QHBoxLayout" name="horizontalLayout_2">
+           <item>
+            <widget class="QRadioButton" name="rB3DPlot">
+             <property name="text">
+              <string>3DPlot</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QRadioButton" name="rB2DPlot">
+             <property name="text">
+              <string>2DPlot</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+       </layout>
       </widget>
       <widget class="QPlainTextEdit" name="logTextEdit">
        <property name="minimumSize">
@@ -115,4 +160,3 @@
  <resources/>
  <connections/>
 </ui>
-

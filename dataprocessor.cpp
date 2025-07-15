@@ -45,14 +45,16 @@ double DataProcessor::getPlotTimeWindow() const
     return m_plotTimeWindowSec;
 }
 
-void DataProcessor::addSample(const double value, QDateTime timestamp)
+void DataProcessor::addSample(const double valueX, const double valueY, const QDateTime timestamp)
 {
     // Clip value to thresholds
-    double const clippedValue = qBound(m_lowerThreshold, value, m_upperThreshold);
+    double const clippedValueX = qBound(m_lowerThreshold, valueX, m_upperThreshold);
+    double const clippedValueY = qBound(m_lowerThreshold, valueY, m_upperThreshold);
 
     Sample s;
     s.timestamp = timestamp;
-    s.value = clippedValue;
+    s.valueX = clippedValueX;
+    s.valueY = clippedValueY;
 
     m_samples.append(s);
 
@@ -79,7 +81,7 @@ QVector<QPointF> DataProcessor::getProcessedCurve(QDateTime currentTime)
         if (countOfPoints == 0){
             timeAnchor = elapsedSec;
         }
-        sum += it->value;
+        sum += it->valueX;
         countOfPoints++;
 
         if (countOfPoints == m_windowSize) {
@@ -90,4 +92,37 @@ QVector<QPointF> DataProcessor::getProcessedCurve(QDateTime currentTime)
         }
     }
     return curve;
+}
+
+QVector<QVector3D> DataProcessor::getProcessedCurve3D(QDateTime currentTime)
+{
+    QVector<QVector3D> curve3D;
+
+    int count = 0;
+    double sumX = 0.0, sumY = 0.0;
+    double timeAnchor = 0.0;
+
+    for (auto it = m_samples.crbegin(); it != m_samples.crend(); ++it) {
+        double elapsedSec = it->timestamp.msecsTo(currentTime) / 1000.0;
+        if (elapsedSec > m_plotTimeWindowSec)
+            break;
+
+        if (count == 0)
+            timeAnchor = elapsedSec;
+
+        sumX += it->valueX;
+        sumY += it->valueY;
+        count++;
+
+        if (count == m_windowSize) {
+            double const avgX = sumX / m_windowSize;
+            double const avgY = sumY / m_windowSize;
+            curve3D.prepend(QVector3D(avgX, avgY, -timeAnchor));
+            count = 0;
+            sumX = 0.0;
+            sumY = 0.0;
+        }
+    }
+
+    return curve3D;
 }

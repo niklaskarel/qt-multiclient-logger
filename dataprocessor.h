@@ -2,6 +2,7 @@
 #define DATAPROCESSOR_H
 
 #include <QVector>
+#include <QVector3D>
 #include <QDateTime>
 #include <QPointF>
 
@@ -21,14 +22,16 @@ public:
     int getWindowSize() const;
     double getPlotTimeWindow() const;
 
-    void addSample(const double value, QDateTime timestamp);
+    void addSample(const double valueX, const double valueY, const QDateTime timestamp);
 
     QVector<QPointF> getProcessedCurve(QDateTime currentTime);
+    QVector<QVector3D> getProcessedCurve3D(QDateTime currentTime);
 
 private:
     struct Sample {
         QDateTime timestamp;
-        double value;
+        double valueX;
+        double valueY;
     };
 
     QVector<Sample> m_samples;

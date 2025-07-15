@@ -6,7 +6,9 @@ This ongoing project is a Qt-based application that functions as a TCP server de
 
 - Supports up to 3 TCP clients simultaneously
 - Parses JSON messages with `clientId`, `type`, `message`, and `timestamp`
-- GUI with real-time log view, control buttons for stopping individual modules and graph that shows sensor data for each client using a moving average
+- GUI with real-time log view, control buttons for stopping individual modules and graph that shows sensor data for each client using a moving average of X values in 2D and X and Y values in 3D in relation to time.
+  - 2D: QCustomPlot (default)
+  - 3D: OpenGL (experimental)
 - Settings dialog to configure: Port number, IP address, Plotting window duration, Thresholds for incoming sensor values, Flush interval and buffer size
 - Graceful disconnection and cleanup on critical failures
 - Python script included to simulate real client traffic with randomized message generation.
@@ -40,13 +42,12 @@ The GUI reacts to message severity—buttons are automatically disabled after CR
 - If **module 1 or 2** sends ERROR message → only that module"s stop button is activated.
 
 ## Build Instructions
-1. Install Qt 6.8.3 and CMake 3.28+
+1. Install Qt 6.8.3 (must include OpenGL and OpenGLWidgets modules) and CMake 3.28+
 2. `cmake -S . -B build`
 3. `cmake --build build`
 4. `cd build`
 5. run the executable
-
-Alternatively this procedure can be dont from the Qt Creator
+6. On Windows, ensure `glu32.lib` is available. On Linux, ensure OpenGL headers and libraries are installed (`libgl1-mesa-dev`, `libglu1-mesa-dev`).
 
 ## Code Highlights
 
@@ -145,7 +146,7 @@ Feel free to adapt, extend, or integrate this logger with your own backend or UI
 - ~~Refactor EventReceiver to use QThread per client socket to improve stability and avoid crashes due to cross-thread access or unexpected deletions. Current design using QTcpServer in the main thread is fragile under high traffic~~ Done in 21.06.2025
 - Refactor Logger to run in its own thread to handle high-throughput message processing.
 - ~~Current architecture is functional but has tightly coupling between UI and control logic. Refactoring planned to introduce an EventController for better separation of concerns (UI vs. logic vs. transport).~~ Done in 07.07.2025
-- Extend visualization support with an **OpenGL-based 3D graph mode** to render the new dual-value message format (`X` for raw input, `Y` for canonicalized [0–100] scale) over time; toggleable via radio buttons to switch between 2D (`QCustomPlot`) and 3D (OpenGL) modes. (ongoing change as of 07.07.2025)
+- ~~Extend visualization support with an **OpenGL-based 3D graph mode** to render the new dual-value message format (`X` for raw input, `Y` for canonicalized [0–100] scale) over time; toggleable via radio buttons to switch between 2D (`QCustomPlot`) and 3D (OpenGL) modes. (ongoing change as of 07.07.2025)~~ (implemented on 16.07.2025)
 - Add QCustomPlot as a dynamic library and not as a static as it is increasing the time for building.
 - Add support for **MQTT** as a communication method between system components, using a publish/subscribe architecture via an MQTT broker
 - Add second way of messaging formating (f.e **XML**, **Protobuf**)

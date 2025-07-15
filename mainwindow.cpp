@@ -20,8 +20,32 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
-    m_customPlot = new QCustomPlot(this);
-    ui->plotWidget->layout()->addWidget(m_customPlot);
+    // Stretch priorities for the layout
+    ui->plotLayout->setStretch(0, 1); // plotStackedModeWidget
+    ui->plotLayout->setStretch(1, 0); // plotModeWidget
+
+    // Safety: Reinforce size policies
+    ui->plotStackedModeWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    ui->plotModeWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    ui->plotModeWidget->setMinimumHeight(50);
+
+    if (!ui->page2DPlot->layout()) {
+        auto layout = new QVBoxLayout(ui->page2DPlot);
+        layout->setContentsMargins(0, 0, 0, 0);
+        ui->page2DPlot->setLayout(layout);
+    }
+
+    m_customPlot = new QCustomPlot(ui->page2DPlot);
+    ui->page2DPlot->layout()->addWidget(m_customPlot);
+
+    if (!ui->page3DPlot->layout()) {
+        auto* layout = new QVBoxLayout(ui->page3DPlot);
+        layout->setContentsMargins(0, 0, 0, 0);
+        ui->page3DPlot->setLayout(layout);
+    }
+
+    m_glPlot = new OpenGL3DPlot(ui->page3DPlot);
+    ui->page3DPlot->layout()->addWidget(m_glPlot);
 
     m_graphModule1 = m_customPlot->addGraph();
     m_graphModule2 = m_customPlot->addGraph();
@@ -37,10 +61,15 @@ MainWindow::MainWindow(QWidget *parent)
     m_customPlot->xAxis->setRange(-10, 0);
     m_customPlot->yAxis->setRange(0, 100);
 
-    m_plotUpdateTimer = new QTimer(this);
-    m_plotUpdateTimer->setInterval(100);
-    connect(m_plotUpdateTimer, &QTimer::timeout, this, &MainWindow::updatePlot);
-    m_plotUpdateTimer->start();
+    m_plot2DUpdateTimer = new QTimer(this);
+    m_plot2DUpdateTimer->setInterval(100);
+    connect(m_plot2DUpdateTimer, &QTimer::timeout, this, &MainWindow::updatePlot2D);
+    m_plot2DUpdateTimer->start();
+
+    m_plot3DUpdateTimer = new QTimer(this);
+    m_plot3DUpdateTimer->setInterval(100);
+    connect(m_plot3DUpdateTimer, &QTimer::timeout, this, &MainWindow::updatePlot3D);
+    m_plot3DUpdateTimer->start();
 
     ui->logTextEdit->setReadOnly(true);
     ui->startModulesButton->setEnabled(true);
@@ -59,6 +88,9 @@ MainWindow::MainWindow(QWidget *parent)
 
     m_watchdogTimer->setInterval(10000);
     connect(m_watchdogTimer, &QTimer::timeout, this, &MainWindow::handleWatchdogTimeout);
+
+    ui->rB2DPlot->setChecked(true);
+    ui->plotStackedModeWidget->setCurrentIndex(0);
 }
 
 void MainWindow::onOpenSettings()
@@ -67,7 +99,7 @@ void MainWindow::onOpenSettings()
     m_controller->setSettingsOnDialog(dlg);
     if (dlg.exec() == QDialog::Accepted)
     {
-         m_controller->applySettings(dlg);
+        m_controller->applySettings(dlg);
     }
 }
 
@@ -202,6 +234,12 @@ void MainWindow::modulesStarted()
 
 void MainWindow::on_startModulesButton_clicked()
 {
+    // set maximum points for openGL
+    if (m_glPlot){
+        const int maxPoints = m_controller->estimateMaxOpenGLPointsPerModule();
+        m_glPlot->setMaxPoints(maxPoints);
+    }
+
     if (!m_controller->startModules())
     {
         QMessageBox::critical(this, "Error", QString("Failed to start TCP server at port %1.\n").arg(m_controller->getLocalPort()));
@@ -255,13 +293,13 @@ void MainWindow::on_stopModule3Button_clicked()
     m_controller->stopModule(3, true);
 }
 
-void MainWindow::updatePlot()
+void MainWindow::updatePlot2D()
 {
     QDateTime currentTime = QDateTime::currentDateTime();
 
-    QVector<QPointF> data1 = m_controller->getProcessedCurve(0, currentTime);
-    QVector<QPointF> data2 = m_controller->getProcessedCurve(1, currentTime);
-    QVector<QPointF> data3 = m_controller->getProcessedCurve(2, currentTime);
+    QVector<QPointF> data1 = m_controller->getProcessedCurve2D(0, currentTime);
+    QVector<QPointF> data2 = m_controller->getProcessedCurve2D(1, currentTime);
+    QVector<QPointF> data3 = m_controller->getProcessedCurve2D(2, currentTime);
 
     m_graphModule1->setData(QVector<double>(), QVector<double>());
     m_graphModule2->setData(QVector<double>(), QVector<double>());
@@ -290,6 +328,17 @@ void MainWindow::updatePlot()
     m_customPlot->xAxis->setRange(-windowSec, 0);
     m_customPlot->yAxis->setRange(0,100);
     m_customPlot->replot();
+}
+
+void MainWindow::updatePlot3D()
+{
+    QDateTime currentTime = QDateTime::currentDateTime();
+
+    for (int moduleId = 0; moduleId < 3; ++moduleId) {
+        QVector<QVector3D> qvec = m_controller->getProcessedCurve3D(moduleId, currentTime);
+        std::vector<QVector3D> stdvec(qvec.begin(), qvec.end());
+        m_glPlot->setPoints(moduleId, stdvec);
+    }
 }
 
 void MainWindow::stopModule(const int clientId, const bool logMessage, const bool stopApplication)
@@ -325,3 +374,19 @@ void MainWindow::loggerFlushedAfterStop()
     ui->startModulesButton->setEnabled(true);
     ui->actionSettings->setEnabled(true);
 }
+
+void MainWindow::on_rB2DPlot_toggled(bool checked)
+{
+    if (checked) {
+       ui->plotStackedModeWidget->setCurrentIndex(0);
+    }
+}
+
+
+void MainWindow::on_rB3DPlot_toggled(bool checked)
+{
+    if (checked) {
+        ui->plotStackedModeWidget->setCurrentIndex(1);
+    }
+}
+

@@ -31,8 +31,12 @@ public:
     void setSettingsOnDialog(Settings & settings);
 
     //Data Processor setters and getters
-    QVector<QPointF> getProcessedCurve(const uint32_t index,QDateTime currentTime);
+    QVector<QPointF> getProcessedCurve2D(const uint32_t index,QDateTime currentTime);
+    QVector<QVector3D> getProcessedCurve3D(const uint32_t index,QDateTime currentTime);
     double getPlotTimeWindow() const;
+    int getWindowSize() const;
+
+    int estimateMaxOpenGLPointsPerModule() const;
 
     //Event Receiver setters and getters
     int getLocalPort() const;

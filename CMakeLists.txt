@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Network Core PrintSupport)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Network Core PrintSupport OpenGL OpenGLWidgets)
 
 set(PROJECT_SOURCES
         main.cpp
@@ -30,6 +30,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         3rdPartyLibraries/QCustomPlot/qcustomplot.cpp 3rdPartyLibraries/QCustomPlot/qcustomplot.h
         pythonprocessmanager.h pythonprocessmanager.cpp
         controller.h controller.cpp
+        opengl3dplot.h opengl3dplot.cpp
 
     )
 # Define target properties for Android with Qt 6 as:
@@ -58,7 +59,16 @@ target_link_libraries(EventMonitor
     Qt${QT_VERSION_MAJOR}::Core
     Qt${QT_VERSION_MAJOR}::Network
     Qt${QT_VERSION_MAJOR}::PrintSupport
+    Qt${QT_VERSION_MAJOR}::OpenGL
+    Qt${QT_VERSION_MAJOR}::OpenGLWidgets
 )
+# Platform-specific OpenGL linkage
+if (WIN32)
+    target_link_libraries(EventMonitor PRIVATE opengl32 glu32)
+elseif (UNIX)
+    find_package(OpenGL REQUIRED)
+    target_link_libraries(EventMonitor PRIVATE OpenGL::GL OpenGL::GLU)
+endif()
 
 target_include_directories(EventMonitor
     PRIVATE

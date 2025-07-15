@@ -100,8 +100,9 @@ def client_loop(client_id):
                     break
             selected_range = random.choices(ranges, weights=weights, k=1)[0]
             subrange = random.choice(selected_range["range"])
-            value = random.uniform(subrange[0], subrange[1])
-            msg_text = f"value:{value:.2f}"
+            valueX = random.uniform(subrange[0], subrange[1])
+            valueY = random.uniform(0, 100)
+            msg_text = f"value=> X:{valueX:.2f}, Y:{valueY:.2f}"
 
             send_message(client_id, "DATA", msg_text)
 
@@ -110,17 +111,17 @@ def client_loop(client_id):
 
             if range_label != last_logged_range:
                 if range_label != "NORMAL":
-                    log_text = f"Value entered {range_label} range: {value:.2f}"
+                    log_text = f"Value entered {range_label} range: {valueX:.2f}"
                     send_message(client_id, range_label, log_text)
                 else:
-                    log_text = f"Value back to normal: {value:.2f}"
+                    log_text = f"Value back to normal: {valueX:.2f}"
                     send_message(client_id, "INFO", log_text)
 
                 last_logged_range_per_client[client_id] = range_label
 
             if range_label == "NORMAL":
                 normal_counter[client_id] += 1
-                normal_values[client_id].append(value)
+                normal_values[client_id].append(valueX)
                 if normal_counter[client_id] == NORMAL_SAMPLE_WINDOW:
                     avg_value = sum(normal_values[client_id]) / NORMAL_SAMPLE_WINDOW
                     log_text = f"Value stable for last 5 samples, average value: {avg_value:.2f}"

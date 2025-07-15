@@ -177,11 +177,12 @@ void Controller::handleMessage(const EventMessage & msg)
         emit newMessage(msg.clientId, MessageType::ERROR);
     } else if  (msg.type == "DATA") {
         qDebug() << "Received DATA:" << msg.text << "from client" << msg.clientId;
-        QRegularExpression regex("value:(\\d+\\.\\d+)");
+        QRegularExpression regex("X:(\\d+\\.\\d+),\\s*Y:(\\d+\\.\\d+)");
         QRegularExpressionMatch match = regex.match(msg.text);
         if (match.hasMatch()) {
-            double value = match.captured(1).toDouble();
-            m_processors[msg.clientId - 1].addSample(value, msg.timestamp);
+            double valueX = match.captured(1).toDouble();
+            double valueY = match.captured(2).toDouble();
+            m_processors[msg.clientId - 1].addSample(valueX, valueY,  msg.timestamp);
         }
     }
 }
@@ -273,12 +274,25 @@ void Controller::flushLoggerAfterAppStop(const QString & msg)
     killPythonProcess();
 }
 
-QVector<QPointF> Controller::getProcessedCurve(const uint32_t index, QDateTime currentTime)
+QVector<QPointF> Controller::getProcessedCurve2D(const uint32_t index, QDateTime currentTime)
 {
     if (index > 2) {
         return {};
     }
     return m_processors[index].getProcessedCurve(currentTime);
+}
+
+QVector<QVector3D> Controller::getProcessedCurve3D(const uint32_t index, QDateTime currentTime)
+{
+    if (index > 2) {
+        return {};
+    }
+    return m_processors[index].getProcessedCurve3D(currentTime);
+}
+
+int Controller::getWindowSize() const
+{
+    return m_processors[0].getWindowSize();
 }
 
 double Controller::getPlotTimeWindow() const
@@ -289,6 +303,19 @@ double Controller::getPlotTimeWindow() const
 int Controller::getLocalPort() const
 {
     return m_localPort;
+}
+
+int Controller::estimateMaxOpenGLPointsPerModule() const
+{
+    const double plotTimeSec = getPlotTimeWindow();
+    const int windowSize = getWindowSize();
+    const int minIntervalMs = 50;                           // fastest possible arrival from python script (20 Hz)
+
+    if (windowSize <= 0)
+        return 100;  // fallback safety
+
+    const double points = (plotTimeSec * 1000.0) / (minIntervalMs * windowSize);
+    return std::max(10, static_cast<int>(points));          // enforce min bound
 }
 
 
