@@ -193,7 +193,6 @@ void MainWindow::displayMessage(const EventMessage &msg) {
                 cursor.insertText(QString("[%1] Message from client%2 %3: %4\n").
                                   arg(msg.timestamp.toString(), QString::number(msg.clientId), msg.type, msg.text), format);
             }
-
         }
         else
         {

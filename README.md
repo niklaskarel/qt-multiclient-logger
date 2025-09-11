@@ -125,6 +125,13 @@ MIT License (or specify yours)
 
 ## Known issues
 
+- [Current] If modules **1 or 2** trigger a **CRITICAL** error, their sockets are closed.  
+  Later, if either:
+  - module **3** sends a CRITICAL error (which tries to close all sockets again), or  
+  - the user closes the application (triggering destructor cleanup),  
+  then a **segmentation fault occurs** due to double-closing / double-deleting sockets.  
+  This will be addressed in a future refactor of the socket shutdown logic.
+
 ~~As of 13.06.2025 The application crashes when the python script generates a critical error for module 3~~
 Fixed on 17.06.2025: Crash caused by improper deletion of client sockets on CRITICAL messages from module 3 was resolved.
 ~~18.06.2025 Python proccess crashed when closing after a critical error in module 3.~~ Fixed

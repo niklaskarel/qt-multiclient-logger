@@ -21,6 +21,11 @@ public:
     explicit Controller(QObject *parent = nullptr);
     ~Controller();
 
+    Controller(const Controller&) = delete;
+    Controller& operator=(const Controller&) = delete;
+    Controller(Controller&&) = delete;
+    Controller& operator=(Controller&&) = delete;
+
     bool startModules();
     bool stopApplication();
     void stopModule(const int clientId,  const bool logMessage);

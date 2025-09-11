@@ -14,6 +14,13 @@ class EventReceiver : public QObject
     Q_OBJECT
 public:
     explicit EventReceiver(QObject *parent = nullptr);
+    ~EventReceiver();
+
+    EventReceiver(const EventReceiver&) = delete;
+    EventReceiver& operator=(const EventReceiver&) = delete;
+    EventReceiver(EventReceiver&&) = delete;
+    EventReceiver& operator=(EventReceiver&&) = delete;
+
     bool listen (const QHostAddress &address, const quint16 port);
     void close();
     bool isListening() const;
@@ -28,8 +35,8 @@ protected slots:
 
 private:
     std::unique_ptr<QTcpServer> m_server;
-    QMap<uint32_t, QPointer<QTcpSocket>> m_clients;
-    QMap<QPointer<QTcpSocket>, QByteArray> m_pendingBuffers;
+    QMap<uint32_t, QTcpSocket*> m_clients;
+    QMap<QTcpSocket*, QByteArray> m_pendingBuffers;
 };
 
 #endif // EVENTRECEIVER_H

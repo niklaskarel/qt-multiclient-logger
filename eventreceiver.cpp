@@ -6,11 +6,61 @@
 #include <QDebug>
 #include <QTimer>
 #include <QDateTime>
-
+#include <QThread>
 
 EventReceiver::EventReceiver(QObject *parent)
     : QObject(parent)
 {
+}
+
+EventReceiver::~EventReceiver()
+{
+    qDebug() << "~EventReceiver called in thread:" << QThread::currentThread();
+
+    if (!m_clients.empty()) {
+         QList<QTcpSocket*> deferredSockets;
+        for (auto& socket : m_clients) {
+            if (socket) {
+                if (socket->thread() != QThread::currentThread()) {
+                    qWarning() << "Socket in wrong thread during ~EventReceiver!";
+                    QMetaObject::invokeMethod(socket, [socket]() {
+                        socket->disconnect();
+                        socket->disconnectFromHost();
+                    }, Qt::BlockingQueuedConnection);
+                    deferredSockets.append(socket);
+                    continue;
+                }
+
+                socket->disconnect();
+                socket->disconnectFromHost();
+                deferredSockets.append(socket);
+            }
+        }
+
+        m_clients.clear();
+
+        for (QTcpSocket* socket : deferredSockets) {
+            if (socket->thread() == QThread::currentThread()) {
+                socket->deleteLater();
+            } else {
+                QMetaObject::invokeMethod(socket, "deleteLater", Qt::QueuedConnection);
+            }
+        }
+    }
+
+    if (!m_pendingBuffers.empty()) {
+        m_pendingBuffers.clear();
+    }
+
+    if (m_server) {
+        if (m_server->thread() != QThread::currentThread()){
+            QMetaObject::invokeMethod(m_server.get(), "close", Qt::BlockingQueuedConnection);
+        }
+        else {
+            m_server->close();
+        }
+        m_server.reset();
+    }
 }
 
 bool EventReceiver::listen (const QHostAddress &address, const uint16_t port)
@@ -30,12 +80,13 @@ bool EventReceiver::listen (const QHostAddress &address, const uint16_t port)
 
 void EventReceiver::close()
 {
+    qDebug() << "Receiver thread is quitting...";
     for (auto &socket : m_clients) {
-        if (socket) {
+        if (socket && socket->thread()) {
             try {
                 socket->disconnect();
                 socket->disconnectFromHost();
-                socket->deleteLater();
+                QMetaObject::invokeMethod(socket, "deleteLater", Qt::BlockingQueuedConnection);
             }
             catch (const std::exception &e) {
                 qDebug() << "Exception while closing the sockets message:" << e.what();
@@ -44,6 +95,19 @@ void EventReceiver::close()
             }
         }
     }
+    // for (auto it = m_clients.begin(); it != m_clients.end(); ++it) {
+    //     QTcpSocket* sock = it.value();
+    //     qDebug() << "Socket at shutdown:" << sock << ", thread:" << sock->thread()
+    //              << ", isValid:" << sock->isValid();
+    // }
+    // auto it = m_pendingBuffers.begin();
+    // while (it != m_pendingBuffers.end() ) {
+    //     if (!it.key()) {
+    //         it = m_pendingBuffers.erase(it);
+    //     } else {
+    //         ++it;
+    //     }
+    // }
     m_clients.clear();
     m_pendingBuffers.clear();
     if (m_server->isListening()){
@@ -66,11 +130,13 @@ void EventReceiver::handleNewConnection()
         connect(clientSocket, &QTcpSocket::disconnected, this, [this]() {
             QPointer<QTcpSocket> sock = qobject_cast<QTcpSocket*>(sender());
             if (!sock) return;
+            if (!m_clients.values().contains(sock.data())) return;
             const int clientKey = m_clients.key(sock, -1);
+            qDebug() << "333 "<< clientKey;
             if (clientKey != -1) {
                 m_clients.remove(clientKey);
             }
-            m_pendingBuffers.remove(sock);
+            m_pendingBuffers.remove(sock.data());
             sock->deleteLater();
         });
     }
@@ -94,7 +160,7 @@ void EventReceiver::onReadyRead(QPointer<QTcpSocket> socket)
         if (!m_pendingBuffers.contains(socket)) {
             m_pendingBuffers[socket] = QByteArray();
         }
-        m_pendingBuffers[socket].append(data);
+        m_pendingBuffers[socket].append(data.data());
         while (true)
         {
             int newlineIndex = m_pendingBuffers[socket].indexOf('\n');
@@ -153,9 +219,7 @@ void EventReceiver::onReadyRead(QPointer<QTcpSocket> socket)
             msg.text = message;
             msg.timestamp = timestamp;
 
-            m_clients[msg.clientId] = socket;
-            emit messageReceived(msg);
-
+            m_clients[msg.clientId] = socket.data();
 
             // if module 3 has a critical message stop the entire logger
             if ((msg.type == "CRITICAL")) {
@@ -165,7 +229,7 @@ void EventReceiver::onReadyRead(QPointer<QTcpSocket> socket)
                         qCritical("All clients are already deleted!");
                         return;
                     }
-                    QList<QPointer<QTcpSocket>> sockets = m_clients.values();
+                    QList<QTcpSocket*> sockets = m_clients.values();
                     for (auto s : sockets) {
                         if (s) {
                             connect(s, &QTcpSocket::disconnected, s, &QTcpSocket::deleteLater);
@@ -182,6 +246,14 @@ void EventReceiver::onReadyRead(QPointer<QTcpSocket> socket)
                     }
                     // Defer the map cleanup
                     QTimer::singleShot(1000, this, [this]() {
+                        auto it = m_pendingBuffers.begin();
+                        while (it != m_pendingBuffers.end() ) {
+                            if (!it.key()) {
+                            it = m_pendingBuffers.erase(it);
+                            } else {
+                                ++it;
+                            }
+                        }
                         m_clients.clear();
                         m_pendingBuffers.clear();
                     });
@@ -191,6 +263,7 @@ void EventReceiver::onReadyRead(QPointer<QTcpSocket> socket)
                     stopClient(msg.clientId);
                 }
             }
+            emit messageReceived(msg);
         }
     }
     catch (const std::exception &e) {
@@ -203,12 +276,31 @@ void EventReceiver::onReadyRead(QPointer<QTcpSocket> socket)
 
 void EventReceiver::stopClient(uint32_t clientId)
 {
+    qDebug() << "stopClient called for" << clientId << "in thread";
     if (m_clients.contains(clientId)) {
-        QPointer<QTcpSocket> socket = m_clients[clientId];
+        QTcpSocket* socket = m_clients[clientId];
         if (!socket) return;
-        connect(socket, &QTcpSocket::disconnected, socket, &QTcpSocket::deleteLater);
+
+        if (socket->state() == QAbstractSocket::UnconnectedState) {
+            qDebug() << "Socket already disconnected";
+            socket->deleteLater();
+            m_pendingBuffers.remove(socket);
+            m_clients.remove(clientId);
+            return;
+        }
+
+        // connect(socket, &QTcpSocket::disconnected, this, [this, clientId, socket]() {
+        //     qDebug() << "111111";
+        //     m_clients.remove(clientId);
+        //     socket->deleteLater();
+        // });
+        //connect(socket, &QTcpSocket::disconnected, socket, &QTcpSocket::deleteLater);
+        // m_pendingBuffers.remove(socket);
+        // socket->disconnect();
         socket->disconnectFromHost();
-        m_clients.remove(clientId);
-        m_pendingBuffers.remove(socket);
+        // QMetaObject::invokeMethod(socket, "deleteLater", Qt::BlockingQueuedConnection);
+        // m_clients.remove(clientId);
+        // m_pendingBuffers.remove(socket);
+
     }
 }

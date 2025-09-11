@@ -45,10 +45,8 @@ Controller::Controller(QObject *parent)
 Controller::~Controller()
 {
     if (m_receiver) {
-        // Schedule deletion in the correct thread and wait
-        QMetaObject::invokeMethod(m_receiver.get(), [this]() {
-            m_receiver.reset();
-        }, Qt::BlockingQueuedConnection);
+        QMetaObject::invokeMethod(m_receiver.get(), "deleteLater", Qt::BlockingQueuedConnection);
+        m_receiver.reset();
     }
 
     if (m_receiverThread) {
@@ -65,13 +63,17 @@ bool Controller::startModules()
         m_receiver = std::make_unique<EventReceiver>();
         isReceiverNew = true;
         connect(m_receiver.get(), &EventReceiver::messageReceived, this, &Controller::handleMessage);
-        connect(m_receiver.get(), &QObject::destroyed, this, [this]() { m_receiver.reset(); });
+        connect(m_receiver.get(), &QObject::destroyed, this, [this]() {
+            m_receiver.release();
+            m_receiver = nullptr;
+        });
     }
 
     if (m_receiverThread && !m_receiverThread->isRunning())
     {
         if (isReceiverNew)
         {
+            isReceiverNew = false;
             m_receiver->moveToThread(m_receiverThread.get());
             connect(m_receiverThread.get(), &QThread::finished, m_receiver.get(), &QObject::deleteLater);
         }
@@ -240,13 +242,18 @@ void Controller::shutdownReceiverSoft()
 {
     if (m_receiver)
     {
-        QMetaObject::invokeMethod(m_receiver.get(), &EventReceiver::close, Qt::QueuedConnection);
+        QMetaObject::invokeMethod(m_receiver.get(), &EventReceiver::close, Qt::BlockingQueuedConnection);
     }
 }
 
 void Controller::shutdownReceiverHard()
 {
-    shutdownReceiverSoft();
+    if (m_receiver && m_receiverThread) {
+        if (m_receiver) {
+            QMetaObject::invokeMethod(m_receiver.get(), "deleteLater", Qt::QueuedConnection);
+        }
+    }
+
     if (m_receiverThread && m_receiverThread->isRunning()) {
         m_receiverThread->quit();
         m_receiverThread->wait();

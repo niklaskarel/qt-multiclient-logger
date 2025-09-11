@@ -28,9 +28,15 @@ protected:
     void resizeGL(int w, int h) override;
     void paintGL() override;
 
+    void mousePressEvent(QMouseEvent* e) override;
+    void mouseMoveEvent(QMouseEvent* e) override;
+    void wheelEvent(QWheelEvent* e) override;
+
 private:
     void setupShaders();
     void setupBuffers();
+
+    void drawAxes();
 
     QOpenGLShaderProgram m_shader;
     QMatrix4x4 m_projMatrix;
@@ -41,6 +47,12 @@ private:
         std::vector<QVector3D> cpuBuffer;
         int activePointCount = 0;
     };
+
+    // Camera control
+    float m_zoom = 1.0f;
+    float m_cameraAngleX = 30.0f;
+    float m_cameraAngleY = -45.0f;
+    QPoint m_lastMousePos;
 
     std::array<ModuleGLData, 3> m_modules;
     std::array<QVector3D, 3> m_colors {
