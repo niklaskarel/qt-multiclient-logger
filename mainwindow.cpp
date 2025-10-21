@@ -217,7 +217,8 @@ void MainWindow::displayMessage(const EventMessage &msg) {
     }, Qt::QueuedConnection);
 }
 
-void MainWindow::handleWatchdogTimeout() {
+void MainWindow::handleWatchdogTimeout()
+{
     appendSystemMessage("No message received in the last 10 seconds.\n");
 }
 
@@ -234,7 +235,8 @@ void MainWindow::modulesStarted()
 void MainWindow::on_startModulesButton_clicked()
 {
     // set maximum points for openGL
-    if (m_glPlot){
+    if (m_glPlot)
+    {
         const int maxPoints = m_controller->estimateMaxOpenGLPointsPerModule();
         m_glPlot->setMaxPoints(maxPoints);
     }
@@ -306,15 +308,18 @@ void MainWindow::updatePlot2D()
 
     QVector<double> x1, y1, x2, y2, x3, y3;
 
-    for (const auto &point : data1) {
+    for (const auto &point : data1)
+    {
         x1.append(point.x());
         y1.append(point.y());
     }
-    for (const auto &point : data2) {
+    for (const auto &point : data2)
+    {
         x2.append(point.x());
         y2.append(point.y());
     }
-    for (const auto &point : data3) {
+    for (const auto &point : data3)
+    {
         x3.append(point.x());
         y3.append(point.y());
     }

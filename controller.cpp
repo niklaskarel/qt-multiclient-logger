@@ -45,8 +45,9 @@ Controller::Controller(QObject *parent)
 Controller::~Controller()
 {
     if (m_receiver) {
-        QMetaObject::invokeMethod(m_receiver.get(), "deleteLater", Qt::BlockingQueuedConnection);
-        m_receiver.reset();
+        QMetaObject::invokeMethod(m_receiver.get(), &EventReceiver::close, Qt::BlockingQueuedConnection);
+        QMetaObject::invokeMethod(m_receiver.get(), "deleteLater", Qt::QueuedConnection);
+        m_receiver.release();
     }
 
     if (m_receiverThread) {
@@ -250,7 +251,9 @@ void Controller::shutdownReceiverHard()
 {
     if (m_receiver && m_receiverThread) {
         if (m_receiver) {
+            QMetaObject::invokeMethod(m_receiver.get(), &EventReceiver::close, Qt::QueuedConnection);
             QMetaObject::invokeMethod(m_receiver.get(), "deleteLater", Qt::QueuedConnection);
+            m_receiver.release();
         }
     }
 

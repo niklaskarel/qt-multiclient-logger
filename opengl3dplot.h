@@ -52,7 +52,7 @@ private:
     float m_zoom = 1.0f;
     float m_cameraAngleX = 30.0f;
     float m_cameraAngleY = -45.0f;
-    QPoint m_lastMousePos;
+    QPointF m_lastMousePos;
 
     std::array<ModuleGLData, 3> m_modules;
     std::array<QVector3D, 3> m_colors {

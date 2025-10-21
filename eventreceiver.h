@@ -21,7 +21,7 @@ public:
     EventReceiver(EventReceiver&&) = delete;
     EventReceiver& operator=(EventReceiver&&) = delete;
 
-    bool listen (const QHostAddress &address, const quint16 port);
+    bool listen(const QHostAddress &address, const quint16 port);
     void close();
     bool isListening() const;
     void stopClient(uint32_t clientId);
@@ -34,9 +34,14 @@ protected slots:
     void onReadyRead(QPointer<QTcpSocket> socket);
 
 private:
+    void closeImpl();
+    void closeSocketOnce(const uint32_t clientId);
+
+private:
     std::unique_ptr<QTcpServer> m_server;
     QMap<uint32_t, QTcpSocket*> m_clients;
     QMap<QTcpSocket*, QByteArray> m_pendingBuffers;
+    QSet<QTcpSocket*> m_closing;
 };
 
 #endif // EVENTRECEIVER_H

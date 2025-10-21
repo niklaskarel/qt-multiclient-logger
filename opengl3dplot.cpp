@@ -20,12 +20,14 @@ OpenGL3DPlot::OpenGL3DPlot(QWidget* parent)
 OpenGL3DPlot::~OpenGL3DPlot()
 {
     makeCurrent();
-    for (auto& mod : m_modules) {
+    for (auto& mod : m_modules)
+    {
         mod.vbo.destroy();
         mod.vao.destroy();
     }
 
-    if (m_shader.isLinked()) {
+    if (m_shader.isLinked())
+    {
         m_shader.release();
         m_shader.removeAllShaders();  // optional cleanup
     }
@@ -52,7 +54,8 @@ void OpenGL3DPlot::paintGL()
     if (!isValid())
         return;
 
-    if (!context() || !context()->isValid()) {
+    if (!context() || !context()->isValid())
+    {
         qDebug() << "OpenGL context invalid!";
         return;
     }
@@ -71,7 +74,8 @@ void OpenGL3DPlot::paintGL()
     view.translate(-50, -50, 0);            // Centering scene
     m_shader.setUniformValue("u_view", view);
     drawAxes();
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 3; ++i)
+    {
         auto& mod = m_modules[i];
         if (mod.cpuBuffer.empty()) continue;
 
@@ -96,9 +100,11 @@ void OpenGL3DPlot::paintGL()
 
 void OpenGL3DPlot::setPoints(int moduleId, const std::vector<QVector3D>& points)
 {
-    if (!isValid()) return;
+    if (!isValid())
+        return;
 
-    if (!context() || !context()->isValid()) {
+    if (!context() || !context()->isValid())
+    {
         qDebug() << "OpenGL context invalid!";
         return;
     }
@@ -159,7 +165,8 @@ void OpenGL3DPlot::setupShaders()
 
 void OpenGL3DPlot::setupBuffers()
 {
-    for (auto& mod : m_modules) {
+    for (auto& mod : m_modules)
+    {
         mod.vao.create();
         mod.vao.bind();
 
@@ -216,13 +223,13 @@ void OpenGL3DPlot::setMaxPoints(const int maxPoints)
 
 void OpenGL3DPlot::mousePressEvent(QMouseEvent* e)
 {
-    m_lastMousePos = e->pos();
+    m_lastMousePos = e->position();
 }
 
 void OpenGL3DPlot::mouseMoveEvent(QMouseEvent* e)
 {
-    int dx = e->position().x() - m_lastMousePos.x();
-    int dy = e->position().y() - m_lastMousePos.y();
+    const float dx = e->position().x() - m_lastMousePos.x();
+    const float dy = e->position().y() - m_lastMousePos.y();
 
     if (e->buttons() & Qt::LeftButton) {
         m_cameraAngleX += dy * 0.5f;
@@ -230,7 +237,7 @@ void OpenGL3DPlot::mouseMoveEvent(QMouseEvent* e)
         update();
     }
 
-    m_lastMousePos = e->pos();
+    m_lastMousePos = e->position();
 }
 
 void OpenGL3DPlot::wheelEvent(QWheelEvent* e)

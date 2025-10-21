@@ -4,7 +4,8 @@
 Writer::Writer(QObject *parent)
     : QThread(parent) {}
 
-Writer::~Writer() {
+Writer::~Writer()
+{
     QMutexLocker locker(&m_mutex);
     m_running = false;
     m_wait.wakeAll();
@@ -12,23 +13,28 @@ Writer::~Writer() {
     wait();
 }
 
-void Writer::setLogFilePath(const QString &path) {
+void Writer::setLogFilePath(const QString &path)
+{
     QMutexLocker locker(&m_mutex);
     m_logFilePath = path;
 }
 
-void Writer::enqueue(const EventMessage &msg) {
+void Writer::enqueue(const EventMessage &msg)
+{
     QMutexLocker locker(&m_mutex);
     m_queue.enqueue(msg);
     m_wait.wakeOne();
 }
 
-void Writer::run() {
-    while (true) {
+void Writer::run()
+{
+    while (true)
+    {
         QMutexLocker locker(&m_mutex);
         if (!m_running && m_queue.isEmpty()) break;
 
-        if (m_queue.isEmpty()) {
+        if (m_queue.isEmpty())
+        {
             m_wait.wait(&m_mutex);
             continue;
         }
